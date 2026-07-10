@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(uuid())
+  name          String?
+  email         String?      @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          String       @default("Pending") // "Pending", "User", "Admin", "Super Admin", "Rejected"
+  departmentId  String?
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  submissions   Submission[]
+  suggestions   Suggestion[]
+  actionItems   ActionItem[]
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model Department {
+  id           String       @id @default(uuid())
+  name         String
+  qrCodeHash   String       @unique
+  users        User[]
+  submissions  Submission[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Submission {
+  id                String       @id @default(uuid())
+  departmentId      String
+  department        Department   @relation(fields: [departmentId], references: [id])
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String       // "BestPractice", "RepetitiveProblem"
+  title             String
+  description       String
+  
+  // Best Practice Specific Fields
+  objective         String?
+  problemAddressed  String?
+  methodology       String?
+  impactSavings     Float?       // Savings amount
+  downtime          Float?       // Hours of downtime saved
+  calculationTable  String?      // Stored as JSON string [{metric, before, after, gain}]
+  
+  // Repetitive Problem Specific Fields
+  equipmentDetails  String?
+  problemStatement  String?
+  impactCalculation String?      // Stored as JSON string [{parameter, value, calculation}]
+  whyWhyAnalysis    String?      // Stored as JSON string [why1, why2, why3, why4, why5]
+  actionTakenTable  String?      // Stored as JSON string [{action, target, status}]
+  
+  beforeImageUrl    String?
+  afterImageUrl     String?
+  attachmentUrl     String?
+  status            String       // "Draft", "Submitted", "Reviewed"
+  submissionMonth   DateTime     @default(now())
+  suggestions       Suggestion[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model Suggestion {
+  id             String       @id @default(uuid())
+  submissionId   String?
+  submission     Submission?  @relation(fields: [submissionId], references: [id])
+  suggestedById  String?
+  suggestedBy    User?        @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
+  guestName      String?
+  guestDept      String?
+  suggestionText String
+  status         String       // "Pending", "Accepted", "Rejected", "Review", "NeedMoreInfo"
+  
+  // Tracking Fields for Steel Plant Execution
+  implementationStage  String?  @default("Pending Review") // "Pending Review", "Feasibility Analysis", "Procurement/Spares", "Execution (Shutdown Required)", "Execution (Running)", "Testing", "Standardized", "Closed"
+  safetyImpact         String?  // "High", "Medium", "Low", "None"
+  costImplication      Float?   // Estimated cost
+  executingDepartment  String?  // Dept responsible for execution
+  targetCompletionDate DateTime?
+  actualCompletionDate DateTime?
+  trackingRemarks      String?  // Notes on blockers/progress
+
+  actionItems    ActionItem[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ActionItem {
+  id           String     @id @default(uuid())
+  suggestionId String
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id])
+  assignedToId String
+  assignedTo   User       @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
+  dueDate      DateTime
+  status       String     // "Open", "InProgress", "Closed"
+  evidenceUrl  String?
+  remarks      String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
