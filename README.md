@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JSPL Workshop Dashboard & PPT Generator
+
+A comprehensive Next.js web application designed to manage monthly workshop submissions, generate automated PowerPoint presentations, and collect live feedback from participants via dynamic QR codes.
+
+## Features
+
+- **Automated PPT Generation**: Instantly compiles user submissions into a beautifully formatted, premium PowerPoint presentation.
+- **Live Feedback System**: Generates dynamic QR codes linked to your local IP network, allowing workshop attendees to scan and submit real-time suggestions from their mobile devices without needing internet access.
+- **User Roles & Access Control**: Secure Role-Based Access Control (RBAC) with `Super Admin`, `Admin`, and `User` roles.
+- **Live Toaster Notifications**: Admins receive instant, non-intrusive popup notifications on the dashboard when a new suggestion is submitted live.
+- **Mobile-First Native Forms**: Feedback forms are engineered to bypass restrictive mobile WebView constraints (like those found in QR scanner apps), ensuring 100% submission reliability across all devices.
+
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your machine:
+1. [Node.js](https://nodejs.org/en/download/) (v18 or higher)
+2. [Git](https://git-scm.com/downloads)
+3. [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Required to run the PostgreSQL database locally)
+
+---
 
 ## Getting Started
 
-First, run the development server:
+Follow these step-by-step instructions to get the project running on your local machine.
 
+### 1. Start the Database
+This project uses a PostgreSQL database. A `docker-compose.yml` file is included to easily spin up a local database container.
+
+Open your terminal in the project root and run:
 ```bash
-npm run dev -- -p 4000
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d
+```
+*Note: The `-d` flag runs it in detached mode so you can continue using the terminal.*
+
+### 2. Install Dependencies
+Install all the necessary Node modules:
+```bash
+npm install
 ```
 
-Open [http://localhost:4000](http://localhost:4000) with your browser to see the result.
+### 3. Setup Environment Variables
+Create a file named `.env` in the root directory and add the following configuration:
+```env
+# PostgreSQL connection string pointing to your local Docker container
+DATABASE_URL="postgresql://jspl_user:jspl_password@localhost:5432/jspl_db?schema=public"
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# NextAuth Configuration
+NEXTAUTH_URL="http://localhost:4000"
+NEXTAUTH_SECRET="any_secure_random_string_here"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Setup the Database Schema
+Sync the Prisma schema with your newly created PostgreSQL database:
+```bash
+npx prisma db push
+```
 
-## Learn More
+### 5. Run the Application
+Start the Next.js development server. We use port `4000` to avoid conflicts with other apps:
+```bash
+npm run dev -- -p 4000
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 6. Access the Dashboard
+- **Local Access**: Open [http://localhost:4000](http://localhost:4000) in your laptop's browser.
+- **Mobile/Network Access**: Look at your terminal output for the **Network** IP (e.g., `http://192.168.x.x:4000`). Make sure your phone is connected to the same Wi-Fi network and open that URL to test mobile features!
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture & Technologies
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Frontend**: Next.js 14 (App Router), React, standard CSS for premium glassy aesthetics.
+- **Backend**: Next.js API Routes, NextAuth for authentication.
+- **Database**: PostgreSQL orchestrated via Prisma ORM.
+- **PPT Generation**: `PptxGenJS`
+- **QR Codes**: `qrcode` & `qrcode.react` (Fully local, no external APIs used).
