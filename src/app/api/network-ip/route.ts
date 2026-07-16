@@ -6,16 +6,15 @@ export async function GET(req: Request) {
   const port = url.port || process.env.PORT || '3000';
   
   const interfaces = os.networkInterfaces();
-  let networkIp = "localhost";
+  let allIps: string[] = [];
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]!) {
       if (iface.family === "IPv4" && !iface.internal) {
-        networkIp = iface.address;
-        break;
+        allIps.push(iface.address);
       }
     }
-    if (networkIp !== "localhost") break;
   }
+  const networkIp = allIps.find(ip => ip.startsWith("192.168.")) || allIps.find(ip => !ip.startsWith("10.")) || allIps[0] || "localhost";
   
   const origin = `http://${networkIp}:${port}`;
   return NextResponse.json({ origin });

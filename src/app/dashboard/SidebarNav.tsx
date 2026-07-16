@@ -11,7 +11,8 @@ import {
   CheckSquare, 
   Settings,
   GitPullRequestDraft,
-  MessageSquarePlus
+  MessageSquarePlus,
+  Users
 } from "lucide-react";
 
 export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
@@ -35,6 +36,10 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
         <MessageSquarePlus size={18} />
         Submit Suggestion
       </Link>
+      <Link href="/dashboard/tracking" className={getClassName("/dashboard/tracking")}>
+        <GitPullRequestDraft size={18} />
+        Tracking
+      </Link>
       {isAdmin && (
         <>
           <Link href="/dashboard/workshop" className={getClassName("/dashboard/workshop")}>
@@ -45,14 +50,14 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
             <MessageSquare size={18} />
             Suggestions
           </Link>
-          <Link href="/dashboard/tracking" className={getClassName("/dashboard/tracking")}>
-            <GitPullRequestDraft size={18} />
-            Tracking
-          </Link>
 
           <Link href="/dashboard/settings" className={getClassName("/dashboard/settings")}>
             <Settings size={18} />
             Settings
+          </Link>
+          <Link href="/dashboard/teams" className={getClassName("/dashboard/teams")}>
+            <Users size={18} />
+            Teams
           </Link>
         </>
       )}

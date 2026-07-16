@@ -5,17 +5,31 @@ import { authOptions } from "@/lib/auth";
 
 export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    // const session = await getServerSession(authOptions);
-    // if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // const userRole = (session.user as any).role;
-
-    // if (userRole !== 'Admin' && userRole !== 'Super Admin') {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    // }
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userRole = (session.user as any).role;
+    const userId = (session.user as any).id;
+    const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
 
     const params = await props.params;
     const id = params.id;
     const data = await req.json();
+
+    const suggestion = await prisma.suggestion.findUnique({
+      where: { id },
+      include: {
+        assignedTeam: {
+          include: { members: true }
+        }
+      }
+    });
+
+    if (!suggestion) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const isMember = suggestion.assignedTeam?.members.some(m => m.id === userId);
+    if (!isAdmin && !isMember) {
+      return NextResponse.json({ error: "Forbidden: Not in assigned team" }, { status: 403 });
+    }
 
     const parseCost = (val: any) => {
       if (!val || String(val).trim() === "") return null;
@@ -29,16 +43,28 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
       return isNaN(d.getTime()) ? null : d;
     };
 
+    const updateData: any = {
+      implementationStage: data.implementationStage || null,
+      safetyImpact: data.safetyImpact || null,
+      costImplication: parseCost(data.costImplication),
+      executingDepartment: data.executingDepartment || null,
+      targetCompletionDate: parseDate(data.targetCompletionDate),
+      actualCompletionDate: parseDate(data.actualCompletionDate),
+      trackingRemarks: data.trackingRemarks || null,
+    };
+
+    if (isAdmin && data.assignedTeamId !== undefined) {
+      updateData.assignedTeamId = data.assignedTeamId === "" ? null : data.assignedTeamId;
+    }
+
     const updated = await prisma.suggestion.update({
       where: { id },
-      data: {
-        implementationStage: data.implementationStage || null,
-        safetyImpact: data.safetyImpact || null,
-        costImplication: parseCost(data.costImplication),
-        executingDepartment: data.executingDepartment || null,
-        targetCompletionDate: parseDate(data.targetCompletionDate),
-        actualCompletionDate: parseDate(data.actualCompletionDate),
-        trackingRemarks: data.trackingRemarks || null,
+      data: updateData,
+      include: {
+        assignedTeam: true,
+        progressLog: {
+          orderBy: { createdAt: 'desc' }
+        }
       }
     });
 

@@ -12,16 +12,15 @@ export async function POST(req: Request) {
     const templateStyle = body.template || 'corporate';
 
     const interfaces = os.networkInterfaces();
-    let networkIp = "localhost";
+    let allIps: string[] = [];
     for (const name of Object.keys(interfaces)) {
       for (const iface of interfaces[name]!) {
         if (iface.family === "IPv4" && !iface.internal) {
-          networkIp = iface.address;
-          break;
+          allIps.push(iface.address);
         }
       }
-      if (networkIp !== "localhost") break;
     }
+    const networkIp = allIps.find(ip => ip.startsWith("192.168.")) || allIps.find(ip => !ip.startsWith("10.")) || allIps[0] || "localhost";
     const port = process.env.PORT || 4000;
     const origin = `http://${networkIp}:${port}`;
     
@@ -113,8 +112,7 @@ export async function POST(req: Request) {
     });
 
     // Calculate total slides to link the QR code to the final slide
-    const numPhotoSlides = dbSubmissions.filter((s: any) => s.type === "RepetitiveProblem" && (s.beforeImageUrl || s.afterImageUrl || s.attachmentUrl)).length;
-    const totalSlides = 4 + dbSubmissions.length + numPhotoSlides; // 1 Cover + 1 Agenda + ... + 1 Feedback + 1 QR
+    const totalSlides = 4 + dbSubmissions.length; // 1 Cover + 1 Agenda + ... + 1 Feedback + 1 QR
 
     // Generate local Base64 QR code for bulletproof offline rendering
     const qrDataUrl = await QRCode.toDataURL(`${origin}/feedback`, { width: 300, margin: 1 });
@@ -283,15 +281,46 @@ export async function POST(req: Request) {
         const textStyle = { w: 4.0, fontSize: 10, color: textBody };
 
         slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 1.1, h: 0.8, ...innerCardStyle });
-        slide.addText("EQUIPMENT DETAILS", { x: 0.5, y: 1.15, ...labelStyle });
-        slide.addText(sub.equipmentDetails || "N/A", { x: 0.5, y: 1.4, h: 0.4, ...textStyle });
+        slide.addText("PROBLEM STATEMENT", { x: 0.5, y: 1.15, ...labelStyle });
+        slide.addText(sub.problemStatement || "N/A", { x: 0.5, y: 1.4, h: 0.4, ...textStyle });
 
-        slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 2.0, h: 1.3, ...innerCardStyle });
-        slide.addText("PROBLEM STATEMENT", { x: 0.5, y: 2.05, ...labelStyle });
-        slide.addText(sub.problemStatement || "N/A", { x: 0.5, y: 2.3, h: 0.9, ...textStyle });
+        slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 2.0, h: 2.7, ...innerCardStyle });
+        slide.addText("WHY-WHY ANALYSIS", { x: 0.5, y: 2.05, ...labelStyle });
+        if (sub.whyWhyAnalysis) {
+          try {
+            const whys = JSON.parse(sub.whyWhyAnalysis);
+            let yPos = 2.3;
+            whys.forEach((why: string, i: number) => {
+              if (why) {
+                slide.addText(`Why ${i+1}: ${why}`, { x: 0.5, y: yPos, w: 4.0, h: 0.2, fontSize: 9, color: textBody, bold: false });
+                yPos += 0.3;
+              }
+            });
+          } catch(e) {}
+        }
 
-        slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 3.5, h: 1.2, w: 4.2, fill: { color: "111111" }, line: { color: accentPrimary, width: 1 } });
-        slide.addText("IMPACT CALCULATION", { x: 0.5, y: 3.55, w: 4.0, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
+        if (sub.actionTakenTable) {
+          slide.addText("ACTION TAKEN TABLE", { x: 4.8, y: 1.1, w: 4.8, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
+          try {
+              const parsedActions = JSON.parse(sub.actionTakenTable);
+              let actionTable: any[] = [
+                [{ text: "Action Taken / Planned", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
+                 { text: "Status", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } }]
+              ];
+              parsedActions.forEach((sugg: any) => actionTable.push([{text: sugg.action, options: {color: textBody}}, {text: sugg.status, options: {color: textBody}}]));
+              
+              slide.addTable(actionTable, { 
+                x: 4.8, y: 1.3, w: 4.8, 
+                border: { type: 'solid', color: cardLine, pt: 0.5 },
+                fill: { color: cardBg }, 
+                fontSize: 8, 
+                colW: [3.8, 1.0]
+              });
+          } catch (e) {}
+        }
+
+        slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 2.4, h: 0.8, w: 4.8, fill: { color: "111111" }, line: { color: accentPrimary, width: 1 } });
+        slide.addText("IMPACT CALCULATION", { x: 4.9, y: 2.45, w: 4.6, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
         
         if (sub.impactCalculation) {
           try {
@@ -308,86 +337,24 @@ export async function POST(req: Request) {
             ]));
             
             slide.addTable(tableData, { 
-              x: 0.5, y: 3.8, w: 4.0, 
+              x: 4.9, y: 2.7, w: 4.6, 
               border: { type: 'solid', color: accentPrimary, pt: 0.5 },
               fill: { color: "111111" }, 
               fontSize: 8, 
-              colW: [1.3, 1.3, 1.4]
+              colW: [1.5, 1.5, 1.6]
             });
           } catch(e) {}
         }
 
-        if (sub.whyWhyAnalysis) {
-          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 1.1, w: 4.8, h: 1.8, fill: { color: cardBg }, line: { color: cardLine, width: 1 } });
-          slide.addText("WHY-WHY ANALYSIS", { x: 4.9, y: 1.15, w: 4.6, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
-          
-          try {
-            const whys = JSON.parse(sub.whyWhyAnalysis);
-            let yPos = 1.4;
-            whys.forEach((why: string) => {
-              if (why) {
-                slide.addText(why, { x: 4.9, y: yPos, w: 4.6, h: 0.2, fontSize: 9, color: textBody });
-                yPos += 0.25;
-              }
-            });
-          } catch(e) {}
-        }
-
-        if (sub.actionTakenTable) {
-          slide.addText("ACTION TAKEN TABLE", { x: 4.8, y: 3.0, w: 4.8, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
-          try {
-              const parsedActions = JSON.parse(sub.actionTakenTable);
-              let actionTable: any[] = [
-                [{ text: "Action Taken / Planned", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
-                 { text: "Status", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } }]
-              ];
-              parsedActions.forEach((sugg: any) => actionTable.push([{text: sugg.action, options: {color: textBody}}, {text: sugg.status, options: {color: textBody}}]));
-              
-              slide.addTable(actionTable, { 
-                x: 4.8, y: 3.2, w: 4.8, 
-                border: { type: 'solid', color: cardLine, pt: 0.5 },
-                fill: { color: cardBg }, 
-                fontSize: 8, 
-                colW: [3.8, 1.0]
-              });
-          } catch (e) {}
-        }
-      }
-
-      // Render images for Repetitive Problem as an extra slide if images exist
-      if (sub.type === "RepetitiveProblem" && (sub.beforeImageUrl || sub.afterImageUrl || sub.attachmentUrl)) {
-        let photoSlide = pptx.addSlide();
-        photoSlide.background = { fill: "1A1A1A" };        
-        photoSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 10, h: 0.5, fill: { color: "111111" } });
-        photoSlide.addText(`Photos: ${sub.title}`, { x: 0.5, y: 0.1, w: 9, h: 0.3, fontSize: 16, color: "FFFFFF", bold: true });
-        
-        let hasBefore = !!sub.beforeImageUrl;
-        let hasAfter = !!sub.afterImageUrl;
-        let hasSupport = !!sub.attachmentUrl;
-        
-        const imageCount = [hasBefore, hasAfter, hasSupport].filter(Boolean).length;
-        if (imageCount > 0) {
-          const w = 9 / imageCount - 0.2;
-          const y = 0.8;
-          const h = 4.0;
-          let currX = 0.5;
-
-          if (hasBefore) {
-            photoSlide.addText("BEFORE", { x: currX, y, w, h: 0.4, fill: { color: "CCCCCC" }, color: "111111", bold: true, align: "center" });
-            photoSlide.addImage({ path: path.join(process.cwd(), "public", sub.beforeImageUrl as string), x: currX, y: y + 0.4, w, h: h - 0.4 });
-            currX += w + 0.2;
+        if (sub.attachmentUrl) {
+          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.4, w: 4.8, h: 1.3, fill: { color: "111111" }, line: { color: accentSecondary, width: 1.5 } });
+          const attachImgPath = path.join(process.cwd(), "public", sub.attachmentUrl);
+          if (fs.existsSync(attachImgPath)) {
+              slide.addImage({ path: attachImgPath, x: 4.8, y: 3.4, w: 4.8, h: 1.3 });
           }
-          if (hasAfter) {
-            photoSlide.addText("AFTER", { x: currX, y, w, h: 0.4, fill: { color: accentPrimary }, color: "111111", bold: true, align: "center" });
-            photoSlide.addImage({ path: path.join(process.cwd(), "public", sub.afterImageUrl as string), x: currX, y: y + 0.4, w, h: h - 0.4 });
-            currX += w + 0.2;
-          }
-          if (hasSupport) {
-            photoSlide.addText("SUPPORTING", { x: currX, y, w, h: 0.4, fill: { color: "666666" }, color: "FFFFFF", bold: true, align: "center" });
-            photoSlide.addImage({ path: path.join(process.cwd(), "public", sub.attachmentUrl as string), x: currX, y: y + 0.4, w, h: h - 0.4 });
-          }
+          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.4, w: 1.5, h: 0.15, fill: { color: "666666" } });
+          slide.addText("SUPPORTING EVIDENCE", { x: 4.8, y: 3.4, w: 1.5, h: 0.15, fontSize: 7, color: "FFFFFF", bold: true, align: "center" });
         }
-        addSmallQr(photoSlide);
       }
       addSmallQr(slide);
     });

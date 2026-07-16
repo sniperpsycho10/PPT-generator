@@ -14,11 +14,28 @@ export default async function TrackingPage() {
   }
   
   const userRole = (session.user as any).role;
+  const userId = (session.user as any).id;
   const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
 
-  // Only fetch "Accepted" suggestions for tracking
+  let whereClause: any = { status: "Accepted" };
+  if (!isAdmin) {
+    whereClause.assignedTeam = {
+      members: {
+        some: { id: userId }
+      }
+    };
+  }
+
   const suggestions = await prisma.suggestion.findMany({
-    where: { status: "Accepted" },
+    where: whereClause,
+    include: {
+      assignedTeam: {
+        include: { members: true }
+      },
+      progressLog: {
+        orderBy: { createdAt: 'desc' }
+      }
+    },
     orderBy: { updatedAt: 'desc' }
   });
 
@@ -26,5 +43,7 @@ export default async function TrackingPage() {
     orderBy: { name: 'asc' }
   });
 
-  return <TrackingClient initialSuggestions={suggestions} departments={departments} isAdmin={isAdmin} />;
+  const teams = isAdmin ? await prisma.team.findMany({ orderBy: { name: 'asc' } }) : [];
+
+  return <TrackingClient initialSuggestions={suggestions} departments={departments} teams={teams} isAdmin={isAdmin} currentUserId={userId} />;
 }

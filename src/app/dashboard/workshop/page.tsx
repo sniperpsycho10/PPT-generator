@@ -43,12 +43,7 @@ export default function WorkshopMode() {
   const slides = [
     { type: "Cover" },
     { type: "Agenda" },
-    ...submissions.flatMap((sub: any) => {
-      if (sub.type === "RepetitiveProblem" && (sub.beforeImageUrl || sub.afterImageUrl || sub.attachmentUrl)) {
-        return [sub, { ...sub, type: "RepetitiveProblemPhotos" }];
-      }
-      return [sub];
-    }),
+    ...submissions,
     { type: "FeedbackGallery" },
     { type: "QRCodeFeedback" }
   ];
@@ -341,43 +336,7 @@ export default function WorkshopMode() {
       );
     }
 
-    if (currentSlide.type === "RepetitiveProblemPhotos") {
-      return renderWrapper(
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ fontWeight: 'bold', fontSize: '1.2rem', paddingLeft: templateStyle === 'modern' ? '6rem' : '0' }}>
-              Department: <span style={{ color: t.accent }}>{currentSlide.department?.name || 'Unknown'}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <div style={{ width: '6px', height: '24px', backgroundColor: t.accent }}></div>
-              <h2 style={{ color: t.heading, fontSize: '1.5rem', margin: 0 }}>
-                Photos: <span style={{ fontWeight: 'normal' }}>{currentSlide.title}</span>
-              </h2>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '2rem', flex: 1, padding: '1rem', backgroundColor: t.cardBg, borderRadius: '8px', border: `1px solid ${t.accent}` }}>
-            {currentSlide.beforeImageUrl && (
-              <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1, backgroundImage: `url('${currentSlide.beforeImageUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                <div style={{ height: '30px', backgroundColor: '#CCC', color: '#111', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>BEFORE</div>
-              </div>
-            )}
-            {currentSlide.afterImageUrl && (
-              <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1, backgroundImage: `url('${currentSlide.afterImageUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                <div style={{ height: '30px', backgroundColor: t.accent, color: '#111', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>AFTER</div>
-              </div>
-            )}
-            {currentSlide.attachmentUrl && (
-              <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1, backgroundImage: `url('${currentSlide.attachmentUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                <div style={{ height: '30px', backgroundColor: '#666', color: '#FFF', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SUPPORTING</div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
+    // (Removed RepetitiveProblemPhotos slide logic)
 
     // Dynamic Data Slides
     return renderWrapper(
@@ -420,39 +379,21 @@ export default function WorkshopMode() {
               </>
             ) : (
               <>
-                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>EQUIPMENT DETAILS</div>
-                  <div style={{ fontSize: '0.9rem' }}>{currentSlide.equipmentDetails || 'N/A'}</div>
-                </div>
-                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 2 }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>PROBLEM STATEMENT</div>
-                  <div style={{ fontSize: '0.9rem' }}>{currentSlide.problemStatement || 'N/A'}</div>
-                </div>
-                <div style={{ backgroundColor: templateStyle === 'dark' ? '#111' : '#EAF4F4', border: `2px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 2, overflowY: 'auto' }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>IMPACT CALCULATION</div>
-                  <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: t.accent, color: 'white' }}>
-                        <th style={{ padding: '4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Parameter</th>
-                        <th style={{ padding: '4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Value</th>
-                        <th style={{ padding: '4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Calculation</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        try {
-                          const table = JSON.parse(currentSlide.impactCalculation || "[]");
-                          return table.map((r: any, i: number) => (
-                            <tr key={i}>
-                              <td style={{ padding: '4px', border: `1px solid ${t.accent}` }}>{r.parameter}</td>
-                              <td style={{ padding: '4px', border: `1px solid ${t.accent}`, fontWeight: 'bold' }}>{r.value}</td>
-                              <td style={{ padding: '4px', border: `1px solid ${t.accent}` }}>{r.calculation}</td>
-                            </tr>
-                          ));
-                        } catch(e) { return null; }
-                      })()}
-                    </tbody>
-                  </table>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
+                    <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>PROBLEM STATEMENT</div>
+                    <div style={{ fontSize: '0.9rem' }}>{currentSlide.problemStatement || 'N/A'}</div>
+                  </div>
+                  
+                  <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1.5, overflowY: 'auto' }}>
+                    <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>WHY-WHY ANALYSIS</div>
+                    {(() => {
+                      try {
+                        const whys = JSON.parse(currentSlide.whyWhyAnalysis || "[]");
+                        return whys.map((why: string, i: number) => why ? <div key={i} style={{ fontSize: '0.85rem', marginBottom: '4px' }}><strong>Why {i+1}:</strong> {why}</div> : null);
+                      } catch(e) { return null; }
+                    })()}
+                  </div>
                 </div>
               </>
             )}
@@ -512,22 +453,13 @@ export default function WorkshopMode() {
               </>
             ) : (
               <>
-                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>WHY-WHY ANALYSIS</div>
-                  {(() => {
-                    try {
-                      const whys = JSON.parse(currentSlide.whyWhyAnalysis || "[]");
-                      return whys.map((why: string, i: number) => why ? <div key={i} style={{ fontSize: '0.8rem', marginBottom: '4px' }}>{why}</div> : null);
-                    } catch(e) { return null; }
-                  })()}
-                </div>
-                <div style={{ flex: 1, marginTop: '1rem' }}>
+                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>ACTION TAKEN TABLE</div>
-                  <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
+                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
                     <thead>
                       <tr style={{ backgroundColor: '#4A90E2', color: 'white' }}>
-                        <th style={{ padding: '4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Action Taken / Planned</th>
-                        <th style={{ padding: '4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Status</th>
+                        <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Action Taken / Planned</th>
+                        <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -536,8 +468,8 @@ export default function WorkshopMode() {
                           const table = JSON.parse(currentSlide.actionTakenTable || "[]");
                           return table.map((r: any, i: number) => (
                             <tr key={i}>
-                              <td style={{ padding: '4px', border: '1px solid #CCCCCC' }}>{r.action}</td>
-                              <td style={{ padding: '4px', border: '1px solid #CCCCCC' }}>{r.status}</td>
+                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{r.action}</td>
+                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{r.status}</td>
                             </tr>
                           ));
                         } catch(e) { return null; }
@@ -545,6 +477,40 @@ export default function WorkshopMode() {
                     </tbody>
                   </table>
                 </div>
+
+                <div style={{ backgroundColor: templateStyle === 'dark' ? '#111' : '#EAF4F4', border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
+                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>IMPACT CALCULATION</div>
+                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: t.accent, color: 'white' }}>
+                        <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Parameter</th>
+                        <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Value</th>
+                        <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Calculation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        try {
+                          const table = JSON.parse(currentSlide.impactCalculation || "[]");
+                          return table.map((r: any, i: number) => (
+                            <tr key={i}>
+                              <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}` }}>{r.parameter}</td>
+                              <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}`, fontWeight: 'bold' }}>{r.value}</td>
+                              <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}` }}>{r.calculation}</td>
+                            </tr>
+                          ));
+                        } catch(e) { return null; }
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+
+                {currentSlide.attachmentUrl && (
+                  <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: '130px' }}>
+                    <div style={{ flex: 1, backgroundImage: `url('${currentSlide.attachmentUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    <div style={{ height: '20px', backgroundColor: '#666', color: '#FFF', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SUPPORTING EVIDENCE</div>
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -22,6 +22,7 @@ model User {
   actionItems   ActionItem[]
   accounts      Account[]
   sessions      Session[]
+  teams         Team[]       @relation("TeamMembers")
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -119,11 +120,15 @@ model Suggestion {
   safetyImpact         String?  // "High", "Medium", "Low", "None"
   costImplication      Float?   // Estimated cost
   executingDepartment  String?  // Dept responsible for execution
+  assignedTeamId       String?
+  assignedTeam         Team?    @relation("TeamSuggestions", fields: [assignedTeamId], references: [id])
+  currentProgress      Int      @default(0)
   targetCompletionDate DateTime?
   actualCompletionDate DateTime?
   trackingRemarks      String?  // Notes on blockers/progress
 
   actionItems    ActionItem[]
+  progressLog    SuggestionProgress[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -138,6 +143,26 @@ model ActionItem {
   status       String     // "Open", "InProgress", "Closed"
   evidenceUrl  String?
   remarks      String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Team {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  members     User[]       @relation("TeamMembers")
+  suggestions Suggestion[] @relation("TeamSuggestions")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model SuggestionProgress {
+  id           String     @id @default(uuid())
+  suggestionId String
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  progress     Int
+  notes        String?
+  photoUrls    String[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }

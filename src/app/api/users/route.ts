@@ -19,7 +19,10 @@ export async function GET(req: Request) {
         name: true,
         email: true,
         role: true,
-        image: true
+        image: true,
+        department: {
+          select: { name: true }
+        }
       },
       orderBy: {
         role: 'desc' // Super Admin first usually

@@ -10,7 +10,11 @@ export async function POST(req: Request) {
     
     const userEmail = session?.user?.email || "dummy@jspl.com";
     
-    let user = await prisma.user.findUnique({ where: { email: userEmail } });
+    let user = await prisma.user.findUnique({ 
+      where: { email: userEmail },
+      include: { department: true }
+    });
+    
     if (!user) {
       user = await prisma.user.create({
         data: {
@@ -18,23 +22,19 @@ export async function POST(req: Request) {
           passwordHash: "password123",
           name: session?.user?.name || "Workshop User",
           role: "Pending"
-        }
+        },
+        include: { department: true }
       });
     }
 
-    const deptName = data.scannedDepartment || "Mechanical";
-    let department = await prisma.department.findFirst({ where: { name: deptName }});
-
-    if (!department) {
-      department = await prisma.department.create({
-        data: { name: deptName, qrCodeHash: `DPT_${Math.random()}` }
-      });
+    if (!user.departmentId) {
+      return NextResponse.json({ error: "User profile incomplete. Please set your department first." }, { status: 400 });
     }
 
     const submission = await prisma.submission.create({
       data: {
         userId: user.id,
-        departmentId: department.id,
+        departmentId: user.departmentId,
         type: data.type,
         title: data.title,
         description: data.description || "",

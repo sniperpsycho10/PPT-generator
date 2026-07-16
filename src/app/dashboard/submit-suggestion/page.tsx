@@ -13,11 +13,14 @@ export default async function SubmitSuggestionPage() {
   }
 
   const userId = (session.user as any).id;
-  const dbUser = await prisma.user.findUnique({ where: { id: userId } });
+  const dbUser = await prisma.user.findUnique({ 
+    where: { id: userId },
+    include: { department: true }
+  });
   
   if (!dbUser) {
     redirect("/auth/login");
   }
 
-  return <SubmitSuggestionClient userName={dbUser.name || ""} userDept={dbUser.departmentId || ""} />;
+  return <SubmitSuggestionClient userName={dbUser.name || ""} userDept={dbUser.department?.name || ""} />;
 }

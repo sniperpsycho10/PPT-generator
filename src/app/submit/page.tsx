@@ -28,7 +28,6 @@ export default function SubmitPage() {
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(!!editId);
   const [activeTab, setActiveTab] = useState<"best-practice" | "problem">("best-practice");
   const [loading, setLoading] = useState(false);
-  const [department, setDepartment] = useState(scannedDept);
 
   const [title, setTitle] = useState("");
   
@@ -121,7 +120,6 @@ export default function SubmitPage() {
       type: activeTab === "best-practice" ? "BestPractice" : "RepetitiveProblem",
       title,
       description: activeTab === "best-practice" ? methodology : problemStatement,
-      scannedDepartment: department,
       status: submitStatus,
       
       // Best Practice
@@ -182,7 +180,7 @@ export default function SubmitPage() {
             </div>
             <div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.2rem' }}>Department</p>
-              <p style={{ fontWeight: 'bold' }}>{department}</p>
+              <p style={{ fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Automatically Linked</p>
             </div>
           </div>
           
@@ -212,20 +210,24 @@ export default function SubmitPage() {
         </div>
       ) : (
         <>
-          <div className="tabs">
-            <button className={`tab-btn ${activeTab === "best-practice" ? "active" : ""}`} onClick={() => setActiveTab("best-practice")} type="button">Best Practice</button>
-            <button className={`tab-btn ${activeTab === "problem" ? "active" : ""}`} onClick={() => setActiveTab("problem")} type="button">Repetitive Problem</button>
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+            <label style={{ flex: 1, border: activeTab === 'best-practice' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'best-practice' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
+              <input type="radio" name="submissionType" checked={activeTab === 'best-practice'} onChange={() => setActiveTab('best-practice')} style={{ width: '24px', height: '24px', accentColor: 'var(--jspl-blue)' }} />
+              <div>
+                <strong style={{ fontSize: '1.2rem', color: 'var(--jspl-blue)', display: 'block' }}>Best Practice</strong>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Calculation table, before/after images</span>
+              </div>
+            </label>
+            <label style={{ flex: 1, border: activeTab === 'problem' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'problem' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
+              <input type="radio" name="submissionType" checked={activeTab === 'problem'} onChange={() => setActiveTab('problem')} style={{ width: '24px', height: '24px', accentColor: 'var(--jspl-blue)' }} />
+              <div>
+                <strong style={{ fontSize: '1.2rem', color: 'var(--jspl-blue)', display: 'block' }}>Repetitive Problem</strong>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Why-Why analysis, action taken table</span>
+              </div>
+            </label>
           </div>
 
           <form className="submit-form glass">
-            <div className="form-group" style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
-              <span style={{ fontSize: '0.8rem', color: '#666', display: 'block', marginBottom: '0.5rem' }}>Department:</span>
-              <select className="input-field" value={department} onChange={(e)=>setDepartment(e.target.value)} required style={{ fontWeight: 'bold', color: 'var(--jspl-blue)' }}>
-                <option value="">Select Department...</option>
-                {DEPARTMENTS.map((d: string) => <option key={d} value={d}>{d}</option>)}
-                {!DEPARTMENTS.includes(department) && department && <option value={department}>{department}</option>}
-              </select>
-            </div>
 
         <div className="form-group">
           <label>Submission Title</label>
@@ -262,6 +264,22 @@ export default function SubmitPage() {
               </div>
             ))}
             <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setCalculationTable([...calculationTable, {metric: "", before: "", after: "", gain: ""}])}>+ Add Metric Row</button>
+
+            <label className="section-label" style={{ marginTop: '1rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Photos & Evidence</label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Before Image (Optional)</label>
+                <input type="file" className="input-field" accept="image/*" onChange={(e) => setBeforeImage(e.target.files?.[0] || null)} />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>After Image (Optional)</label>
+                <input type="file" className="input-field" accept="image/*" onChange={(e) => setAfterImage(e.target.files?.[0] || null)} />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginTop: '0.5rem' }}>
+              <label>Supporting Image (Optional)</label>
+              <input type="file" className="input-field" accept="image/*" onChange={(e) => setSupportingImage(e.target.files?.[0] || null)} />
+            </div>
           </>
         ) : (
           <>
@@ -308,25 +326,13 @@ export default function SubmitPage() {
             ))}
             <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setActionTakenTable([...actionTakenTable, {action: "", target: "", status: ""}])}>+ Add Action Row</button>
 
+            <label className="section-label" style={{ marginTop: '1rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Supporting Evidence</label>
+            <div className="form-group" style={{ marginTop: '0.5rem' }}>
+              <label>Upload Image (Optional)</label>
+              <input type="file" className="input-field" accept="image/*" onChange={(e) => setSupportingImage(e.target.files?.[0] || null)} />
+            </div>
           </>
         )}
-
-        <div className="form-row">
-          <div className="form-group w-50">
-            <label>Before Image (Optional)</label>
-            <input type="file" className="input-field" accept="image/*" onChange={(e) => setBeforeImage(e.target.files?.[0] || null)} />
-          </div>
-          <div className="form-group w-50">
-            <label>After Image (Optional)</label>
-            <input type="file" className="input-field" accept="image/*" onChange={(e) => setAfterImage(e.target.files?.[0] || null)} />
-          </div>
-        </div>
-        
-        <div className="form-group" style={{ marginTop: '1rem' }}>
-          <label>Supporting Image (Optional)</label>
-          <input type="file" className="input-field" accept="image/*" onChange={(e) => setSupportingImage(e.target.files?.[0] || null)} />
-        </div>
-
         <div className="form-actions" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
           <button type="button" className="btn" style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid var(--jspl-blue)', color: 'var(--jspl-blue)' }} onClick={(e) => handleSubmit(e, "Draft")} disabled={loading}>
             {loading ? "Saving..." : "Save as Draft"}

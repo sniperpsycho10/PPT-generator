@@ -99,6 +99,7 @@ export default function SettingsPage() {
                   <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)' }}>User</th>
                   <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)' }}>Role / Status</th>
                   <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)' }}>Email Address</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)' }}>Department</th>
                   <th style={{ padding: '1rem', textAlign: 'left', color: 'var(--text-secondary)' }}>Actions</th>
                 </tr>
               </thead>
@@ -139,6 +140,11 @@ export default function SettingsPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
                           <Mail size={16} />
                           {user.email}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
+                          {user.department?.name || <span style={{ color: '#999', fontStyle: 'italic' }}>Not Set</span>}
                         </div>
                       </td>
                       <td style={{ padding: '1rem' }}>

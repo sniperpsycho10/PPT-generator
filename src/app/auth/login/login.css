@@ -199,3 +199,38 @@
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem;
+    gap: 2rem;
+  }
+  
+  .login-left {
+    max-width: 100%;
+    text-align: center;
+  }
+
+  .login-left h1 {
+    font-size: 2.5rem;
+  }
+
+  .login-left h3 {
+    font-size: 1.2rem;
+  }
+
+  .login-right {
+    max-width: 100%;
+  }
+
+  .glass-card {
+    padding: 1.5rem;
+  }
+  
+  .login-bg-text {
+    font-size: 30vw;
+  }
+}

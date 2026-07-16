@@ -84,45 +84,7 @@ export default function SubmitSuggestionClient({ userName, userDept }: Props) {
         
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Your Name <span style={{ color: '#e74c3c' }}>*</span></label>
-              <input 
-                type="text" 
-                className="input-field" 
-                style={{ padding: '0.75rem 1rem', fontSize: '1rem', backgroundColor: 'var(--input-bg)' }}
-                placeholder="Enter your name" 
-                value={name} 
-                onChange={e => setName(e.target.value)} 
-              />
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Department <span style={{ color: '#e74c3c' }}>*</span></label>
-              <select 
-                className="input-field" 
-                style={{ padding: '0.75rem 1rem', fontSize: '1rem', backgroundColor: 'var(--input-bg)' }}
-                value={dept} 
-                onChange={e => setDept(e.target.value)}
-              >
-                <option value="" disabled>Select Department</option>
-                <option value="Blast Furnace">Blast Furnace</option>
-                <option value="Steel Melting Shop (SMS)">Steel Melting Shop (SMS)</option>
-                <option value="Rolling Mills">Rolling Mills</option>
-                <option value="Coke Oven">Coke Oven</option>
-                <option value="Sinter Plant">Sinter Plant</option>
-                <option value="Direct Reduced Iron (DRI)">Direct Reduced Iron (DRI)</option>
-                <option value="Power Plant">Power Plant</option>
-                <option value="Maintenance & Engineering">Maintenance & Engineering</option>
-                <option value="Quality Control (QA/QC)">Quality Control (QA/QC)</option>
-                <option value="Safety & Environment">Safety & Environment</option>
-                <option value="Logistics & Supply Chain">Logistics & Supply Chain</option>
-                <option value="Human Resources (HR)">Human Resources (HR)</option>
-                <option value="IT & Automation">IT & Automation</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-          </div>
+          
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Suggestion / Insight <span style={{ color: '#e74c3c' }}>*</span></label>
