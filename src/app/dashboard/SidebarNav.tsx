@@ -28,36 +28,44 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
         <LayoutDashboard size={18} />
         Overview
       </Link>
+      
       <Link href="/dashboard/submissions" className={getClassName("/dashboard/submissions")}>
         <FileText size={18} />
         Submissions
       </Link>
+      
       <Link href="/dashboard/submit-suggestion" className={getClassName("/dashboard/submit-suggestion")}>
         <MessageSquarePlus size={18} />
         Submit Suggestion
       </Link>
+      
+      {isAdmin && (
+        <Link href="/dashboard/suggestions" className={getClassName("/dashboard/suggestions")}>
+          <MessageSquare size={18} />
+          Suggestions
+        </Link>
+      )}
+
       <Link href="/dashboard/tracking" className={getClassName("/dashboard/tracking")}>
         <GitPullRequestDraft size={18} />
         Tracking
       </Link>
+
       {isAdmin && (
         <>
           <Link href="/dashboard/workshop" className={getClassName("/dashboard/workshop")}>
             <Presentation size={18} />
             Workshop Mode
           </Link>
-          <Link href="/dashboard/suggestions" className={getClassName("/dashboard/suggestions")}>
-            <MessageSquare size={18} />
-            Suggestions
+          
+          <Link href="/dashboard/teams" className={getClassName("/dashboard/teams")}>
+            <Users size={18} />
+            Teams
           </Link>
 
           <Link href="/dashboard/settings" className={getClassName("/dashboard/settings")}>
             <Settings size={18} />
             Settings
-          </Link>
-          <Link href="/dashboard/teams" className={getClassName("/dashboard/teams")}>
-            <Users size={18} />
-            Teams
           </Link>
         </>
       )}
