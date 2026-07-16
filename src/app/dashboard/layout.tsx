@@ -9,6 +9,7 @@ import SignOutButton from "./SignOutButton";
 import LiveToaster from "./LiveToaster";
 import SidebarNav from "./SidebarNav";
 import ThemeToggle from "./ThemeToggle";
+import NotificationBell from "./NotificationBell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -61,6 +62,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <header className="dashboard-header">
           <div className="header-title">Dashboard</div>
           <div className="header-profile" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <NotificationBell />
             <ThemeToggle />
             <div className="profile-pill">
               {session?.user?.image ? (

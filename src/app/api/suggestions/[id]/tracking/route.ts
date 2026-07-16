@@ -54,7 +54,30 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
     };
 
     if (isAdmin && data.assignedTeamId !== undefined) {
-      updateData.assignedTeamId = data.assignedTeamId === "" ? null : data.assignedTeamId;
+      const newTeamId = data.assignedTeamId === "" ? null : data.assignedTeamId;
+      
+      // If team changed to a new team, notify members
+      if (newTeamId && newTeamId !== suggestion.assignedTeamId) {
+        const teamWithMembers = await prisma.team.findUnique({
+          where: { id: newTeamId },
+          include: { members: true }
+        });
+
+        if (teamWithMembers && teamWithMembers.members.length > 0) {
+          const notificationData = teamWithMembers.members.map(member => ({
+            userId: member.id,
+            title: "New Assignment",
+            message: `Your team (${teamWithMembers.name}) has been assigned to a new suggestion.`,
+            link: `/dashboard/tracking`, // Optional link to redirect users
+          }));
+          
+          await prisma.notification.createMany({
+            data: notificationData
+          });
+        }
+      }
+      
+      updateData.assignedTeamId = newTeamId;
     }
 
     const updated = await prisma.suggestion.update({
