@@ -83,6 +83,9 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         beforeImageUrl: data.beforeImageUrl,
         afterImageUrl: data.afterImageUrl,
         attachmentUrl: data.attachmentUrl,
+        supportingSlideType: data.supportingSlideType,
+        customTable: data.customTable,
+        supportingImages: data.supportingImages || [],
       }
     });
 

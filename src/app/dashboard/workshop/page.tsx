@@ -27,7 +27,7 @@ export default function WorkshopMode() {
     fetch('/api/submissions')
       .then(r => r.json())
       .then(res => {
-        if (res.data) setSubmissions(res.data);
+        if (res.data) setSubmissions(res.data.filter((s: any) => s.status === 'Accepted'));
       })
       .catch(console.error);
 
@@ -349,7 +349,7 @@ export default function WorkshopMode() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <div style={{ width: '6px', height: '24px', backgroundColor: t.accent }}></div>
             <h2 style={{ color: t.heading, fontSize: '1.5rem', margin: 0 }}>
-              {currentSlide.type === "BestPractice" ? "BEST PRACTICE:" : "Repetitive:"} <span style={{ fontWeight: 'normal' }}>{currentSlide.title}</span>
+              {currentSlide.type === "BestPractice" ? "BEST PRACTICE:" : currentSlide.type === "RepetitiveProblem" ? "Repetitive:" : "SUPPORTING:"} <span style={{ fontWeight: 'normal' }}>{currentSlide.title}</span>
             </h2>
           </div>
         </div>
@@ -377,7 +377,7 @@ export default function WorkshopMode() {
                   <div style={{ fontSize: '0.9rem' }}>Cost Impact: Approx Rs. {currentSlide.impactSavings || 0} Lakhs.</div>
                 </div>
               </>
-            ) : (
+            ) : currentSlide.type === "RepetitiveProblem" ? (
               <>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
@@ -393,6 +393,30 @@ export default function WorkshopMode() {
                         return whys.map((why: string, i: number) => why ? <div key={i} style={{ fontSize: '0.85rem', marginBottom: '4px' }}><strong>Why {i+1}:</strong> {why}</div> : null);
                       } catch(e) { return null; }
                     })()}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>CUSTOM TABLE</div>
+                  <div style={{ overflowX: 'auto', flex: 1 }}>
+                    <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
+                      <tbody>
+                        {(() => {
+                          try {
+                            const table = JSON.parse(currentSlide.customTable || "[]");
+                            return table.map((r: string[], i: number) => (
+                              <tr key={i}>
+                                {r.map((c: string, j: number) => (
+                                  <td key={j} style={{ padding: '6px', border: `1px solid ${t.accent}`, textAlign: 'center', backgroundColor: i === 0 ? t.accent : 'transparent', color: i === 0 ? 'white' : 'inherit', fontWeight: i === 0 ? 'bold' : 'normal' }}>{c}</td>
+                                ))}
+                              </tr>
+                            ));
+                          } catch(e) { return null; }
+                        })()}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </>
@@ -451,7 +475,7 @@ export default function WorkshopMode() {
                   </div>
                 </div>
               </>
-            ) : (
+            ) : currentSlide.type === "RepetitiveProblem" ? (
               <>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>ACTION TAKEN TABLE</div>
@@ -511,6 +535,17 @@ export default function WorkshopMode() {
                     <div style={{ height: '20px', backgroundColor: '#666', color: '#FFF', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SUPPORTING EVIDENCE</div>
                   </div>
                 )}
+              </>
+            ) : (
+              <>
+                <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>SUPPORTING PICTURES</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', flex: 1 }}>
+                  {currentSlide.supportingImages && currentSlide.supportingImages.map((img: string, idx: number) => (
+                    <div key={idx} style={{ backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: '150px', gridColumn: idx === 2 ? 'span 2' : 'span 1' }}>
+                      <div style={{ flex: 1, backgroundImage: `url('${img}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />
+                    </div>
+                  ))}
+                </div>
               </>
             )}
           </div>

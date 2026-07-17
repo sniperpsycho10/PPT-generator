@@ -76,7 +76,7 @@ model Submission {
   department        Department   @relation(fields: [departmentId], references: [id])
   userId            String
   user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type              String       // "BestPractice", "RepetitiveProblem"
+  type              String       // "BestPractice", "RepetitiveProblem", "SupportingSlide"
   title             String
   description       String
   
@@ -98,7 +98,13 @@ model Submission {
   beforeImageUrl    String?
   afterImageUrl     String?
   attachmentUrl     String?
-  status            String       // "Draft", "Submitted", "Reviewed"
+  
+  // Supporting Slide Specific Fields
+  supportingSlideType String?      // "BestPractice" or "RepetitiveProblem"
+  customTable         String?      // Stored as JSON string (e.g. string[][])
+  supportingImages    String[]     // Array of image URLs (up to 3)
+
+  status            String       // "Draft", "Submitted", "Reviewed", "Accepted"
   submissionMonth   DateTime     @default(now())
   suggestions       Suggestion[]
   createdAt         DateTime     @default(now())

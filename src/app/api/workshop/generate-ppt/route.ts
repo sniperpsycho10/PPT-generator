@@ -107,7 +107,7 @@ export async function POST(req: Request) {
 
     // FETCH REAL DATA
     const dbSubmissions = await prisma.submission.findMany({
-      where: { status: { in: ["Submitted", "Accepted"] } },
+      where: { status: "Accepted" },
       include: { department: true, suggestions: true }
     });
 
@@ -269,7 +269,7 @@ export async function POST(req: Request) {
         slide.addShape(pptx.ShapeType.rect, { x: 8.3, y: 3.0, w: 0.8, h: 0.15, fill: { color: "666666" } });
         slide.addText("SUPPORTING", { x: 8.3, y: 3.0, w: 0.8, h: 0.15, fontSize: 7, color: "FFFFFF", bold: true, align: "center" });
         
-      } else {
+      } else if (sub.type === "RepetitiveProblem") {
         slide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.3, fill: { color: accentPrimary } });
         slide.addText([
           { text: "Repetitive : ", options: { color: textHeading, bold: true } },
@@ -354,6 +354,55 @@ export async function POST(req: Request) {
           }
           slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.4, w: 1.5, h: 0.15, fill: { color: "666666" } });
           slide.addText("SUPPORTING EVIDENCE", { x: 4.8, y: 3.4, w: 1.5, h: 0.15, fontSize: 7, color: "FFFFFF", bold: true, align: "center" });
+        }
+      } else {
+        // Supporting Slide
+        slide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.3, fill: { color: accentPrimary } });
+        slide.addText([
+          { text: "SUPPORTING : ", options: { color: textHeading, bold: true } },
+          { text: sub.title, options: { color: textBody, bold: false } }
+        ], { x: headerX + 0.1, y: 0.6, w: 9, h: 0.3, fontSize: 18 });
+        
+        if (sub.customTable) {
+          slide.addText("CUSTOM TABLE", { x: 0.4, y: 1.1, w: 9, h: 0.2, fontSize: 9, color: textHeading, bold: true });
+          try {
+            const parsedTable = JSON.parse(sub.customTable);
+            if (parsedTable.length > 0) {
+              const numCols = parsedTable[0].length;
+              const colW = Array(numCols).fill(9.2 / numCols);
+              let tableData: any[] = [];
+              parsedTable.forEach((row: string[], rIdx: number) => {
+                const isHeader = rIdx === 0;
+                tableData.push(row.map((cell: string) => ({
+                  text: cell,
+                  options: {
+                    color: isHeader ? "FFFFFF" : textBody,
+                    fill: isHeader ? accentPrimary : cardBg,
+                    bold: isHeader
+                  }
+                })));
+              });
+              slide.addTable(tableData, { 
+                x: 0.4, y: 1.3, w: 9.2, 
+                border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
+                fill: { color: cardBg }, 
+                fontSize: 9, 
+                colW: colW
+              });
+            }
+          } catch(e) {}
+        }
+
+        if (sub.supportingImages && sub.supportingImages.length > 0) {
+          slide.addText("SUPPORTING PICTURES", { x: 0.4, y: 3.5, w: 9, h: 0.2, fontSize: 9, color: accentPrimary, bold: true });
+          let imgX = 0.4;
+          sub.supportingImages.forEach((img: string) => {
+             const imgPath = path.join(process.cwd(), "public", img);
+             if (fs.existsSync(imgPath)) {
+                 slide.addImage({ path: imgPath, x: imgX, y: 3.7, w: 2.8, h: 1.6, sizing: { type: 'contain', w: 2.8, h: 1.6 } });
+             }
+             imgX += 3.0;
+          });
         }
       }
       addSmallQr(slide);

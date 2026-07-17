@@ -46,7 +46,7 @@ export default async function SubmissionsPage() {
               <tr key={sub.id} style={{ borderBottom: '1px solid #eee' }}>
                 <td style={{ padding: '1rem 0', fontWeight: 'bold' }}>{sub.title}</td>
                 <td>{sub.department?.name || 'Unknown'}</td>
-                <td>{sub.type === "BestPractice" ? "Best Practice" : "Repetitive Problem"}</td>
+                <td>{sub.type === "BestPractice" ? "Best Practice" : sub.type === "RepetitiveProblem" ? "Repetitive Problem" : `Supporting Doc for ${sub.supportingSlideType === 'BestPractice' ? 'Best Practice' : 'Repetitive Problem'}`}</td>
                 <td>
                   <span style={{ 
                     padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold',

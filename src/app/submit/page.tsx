@@ -1,32 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import "./submit.css";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, X } from "lucide-react";
 
-const DEPARTMENTS = [
-  "SMS (Steel Melting Shop)",
-  "Blast Furnace",
-  "Coke Ovens",
-  "Rolling Mill",
-  "Sinter Plant",
-  "Power Plant",
-  "Raw Material Handling",
-  "Mechanical Maintenance",
-  "Electrical Maintenance",
-  "Quality Control",
-  "Safety",
-  "General Administration"
-];
-
-export default function SubmitPage() {
+function SubmitPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const scannedDept = searchParams.get('dept') || "Mechanical"; 
   const editId = searchParams.get('edit');
 
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(!!editId);
-  const [activeTab, setActiveTab] = useState<"best-practice" | "problem">("best-practice");
+  const [activeTab, setActiveTab] = useState<"best-practice" | "problem" | "supporting-slide">("best-practice");
   const [loading, setLoading] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -45,10 +30,22 @@ export default function SubmitPage() {
   const [impactCalculation, setImpactCalculation] = useState([{ parameter: "", value: "", calculation: "" }]);
   const [actionTakenTable, setActionTakenTable] = useState([{ action: "", target: "", status: "" }]);
   
+  // Supporting Slide fields
+  const [supportingSlideType, setSupportingSlideType] = useState<"BestPractice" | "RepetitiveProblem">("BestPractice");
+  const [customTable, setCustomTable] = useState<string[][]>([
+    ["Header 1", "Header 2", "Header 3"],
+    ["Data 1", "Data 2", "Data 3"]
+  ]);
+
   // Images
   const [beforeImage, setBeforeImage] = useState<File | null>(null);
   const [afterImage, setAfterImage] = useState<File | null>(null);
   const [supportingImage, setSupportingImage] = useState<File | null>(null);
+  
+  // Custom Images for Supporting Slide
+  const [suppImg1, setSuppImg1] = useState<File | null>(null);
+  const [suppImg2, setSuppImg2] = useState<File | null>(null);
+  const [suppImg3, setSuppImg3] = useState<File | null>(null);
 
   useEffect(() => {
     if (editId) {
@@ -58,7 +55,7 @@ export default function SubmitPage() {
           if (res.success && res.data) {
              const data = res.data;
              setTitle(data.title || "");
-             setDepartment(data.department?.name || "Mechanical");
+             
              if (data.type === "RepetitiveProblem") {
                setActiveTab("problem");
                setEquipmentDetails(data.equipmentDetails || "");
@@ -66,6 +63,10 @@ export default function SubmitPage() {
                try { if (data.whyWhyAnalysis) setWhyWhyAnalysis(JSON.parse(data.whyWhyAnalysis)); } catch(e){}
                try { if (data.impactCalculation) setImpactCalculation(JSON.parse(data.impactCalculation)); } catch(e){}
                try { if (data.actionTakenTable) setActionTakenTable(JSON.parse(data.actionTakenTable)); } catch(e){}
+             } else if (data.type === "SupportingSlide") {
+               setActiveTab("supporting-slide");
+               setSupportingSlideType(data.supportingSlideType || "BestPractice");
+               try { if (data.customTable) setCustomTable(JSON.parse(data.customTable)); } catch(e){}
              } else {
                setActiveTab("best-practice");
                setObjective(data.objective || "");
@@ -98,28 +99,39 @@ export default function SubmitPage() {
     }
   };
 
+  const addCustomRow = () => {
+    if (customTable.length === 0) {
+      setCustomTable([[""]]);
+      return;
+    }
+    const cols = customTable[0].length;
+    setCustomTable([...customTable, Array(cols).fill("")]);
+  };
+
+  const addCustomCol = () => {
+    if (customTable.length === 0) {
+      setCustomTable([[""]]);
+      return;
+    }
+    setCustomTable(customTable.map(row => [...row, ""]));
+  };
+
+  const removeCustomRow = (idx: number) => {
+    setCustomTable(customTable.filter((_, i) => i !== idx));
+  };
+
+  const removeCustomCol = (idx: number) => {
+    setCustomTable(customTable.map(row => row.filter((_, i) => i !== idx)));
+  };
+
   const handleSubmit = async (e: React.FormEvent, submitStatus: "Draft" | "Submitted") => {
     e.preventDefault();
     setLoading(true);
 
-    let beforeImageUrl = "";
-    let afterImageUrl = "";
-    let attachmentUrl = "";
-
-    if (beforeImage) {
-      beforeImageUrl = await uploadImage(beforeImage) || "";
-    }
-    if (afterImage) {
-      afterImageUrl = await uploadImage(afterImage) || "";
-    }
-    if (supportingImage) {
-      attachmentUrl = await uploadImage(supportingImage) || "";
-    }
-
     const payload: any = {
-      type: activeTab === "best-practice" ? "BestPractice" : "RepetitiveProblem",
+      type: activeTab === "best-practice" ? "BestPractice" : (activeTab === "problem" ? "RepetitiveProblem" : "SupportingSlide"),
       title,
-      description: activeTab === "best-practice" ? methodology : problemStatement,
+      description: activeTab === "best-practice" ? methodology : (activeTab === "problem" ? problemStatement : "Supporting slide"),
       status: submitStatus,
       
       // Best Practice
@@ -127,19 +139,32 @@ export default function SubmitPage() {
       problemAddressed,
       methodology,
       impactSavings: parseFloat(impactSavings) || 0,
-      calculationTable,
+      calculationTable: JSON.stringify(calculationTable),
       
       // Problem
       equipmentDetails,
       problemStatement,
-      whyWhyAnalysis,
-      impactCalculation,
-      actionTakenTable
+      whyWhyAnalysis: JSON.stringify(whyWhyAnalysis),
+      impactCalculation: JSON.stringify(impactCalculation),
+      actionTakenTable: JSON.stringify(actionTakenTable),
+      
+      // Supporting Slide
+      supportingSlideType,
+      customTable: JSON.stringify(customTable),
+      supportingImages: []
     };
 
-    if (beforeImageUrl) payload.beforeImageUrl = beforeImageUrl;
-    if (afterImageUrl) payload.afterImageUrl = afterImageUrl;
-    if (attachmentUrl) payload.attachmentUrl = attachmentUrl;
+    if (activeTab === "supporting-slide") {
+      let i1 = ""; let i2 = ""; let i3 = "";
+      if (suppImg1) i1 = await uploadImage(suppImg1) || "";
+      if (suppImg2) i2 = await uploadImage(suppImg2) || "";
+      if (suppImg3) i3 = await uploadImage(suppImg3) || "";
+      payload.supportingImages = [i1, i2, i3].filter(Boolean);
+    } else {
+      if (beforeImage) payload.beforeImageUrl = await uploadImage(beforeImage) || "";
+      if (afterImage) payload.afterImageUrl = await uploadImage(afterImage) || "";
+      if (supportingImage) payload.attachmentUrl = await uploadImage(supportingImage) || "";
+    }
 
     try {
       const url = editId ? `/api/submissions/${editId}` : "/api/submissions";
@@ -184,24 +209,6 @@ export default function SubmitPage() {
             </div>
           </div>
           
-          <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Details</h3>
-          <div style={{ background: 'var(--bg-main)', padding: '1.5rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-            {activeTab === "best-practice" ? (
-              <>
-                <p><strong>Objective:</strong> {objective}</p>
-                <p><strong>Problem Addressed:</strong> {problemAddressed}</p>
-                <p><strong>Methodology:</strong> {methodology}</p>
-                <p><strong>Impact Savings:</strong> ₹{impactSavings} Lakhs</p>
-              </>
-            ) : (
-              <>
-                <p><strong>Equipment Details:</strong> {equipmentDetails}</p>
-                <p><strong>Problem Statement:</strong> {problemStatement}</p>
-                <p><strong>Why-Why Analysis:</strong> {whyWhyAnalysis.filter(w => w).join(" ➔ ")}</p>
-              </>
-            )}
-          </div>
-          
           <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
             <button className="btn btn-primary" style={{ padding: '0.8rem 2rem', fontSize: '1.1rem' }} onClick={() => setIsPreviewMode(false)}>
               Unlock for Editing
@@ -210,19 +217,26 @@ export default function SubmitPage() {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-            <label style={{ flex: 1, border: activeTab === 'best-practice' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'best-practice' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+            <label style={{ flex: 1, minWidth: '200px', border: activeTab === 'best-practice' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'best-practice' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
               <input type="radio" name="submissionType" checked={activeTab === 'best-practice'} onChange={() => setActiveTab('best-practice')} style={{ width: '24px', height: '24px', accentColor: 'var(--jspl-blue)' }} />
               <div>
-                <strong style={{ fontSize: '1.2rem', color: 'var(--jspl-blue)', display: 'block' }}>Best Practice</strong>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Calculation table, before/after images</span>
+                <strong style={{ fontSize: '1.1rem', color: 'var(--jspl-blue)', display: 'block' }}>Best Practice</strong>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Standard template</span>
               </div>
             </label>
-            <label style={{ flex: 1, border: activeTab === 'problem' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'problem' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
+            <label style={{ flex: 1, minWidth: '200px', border: activeTab === 'problem' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'problem' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
               <input type="radio" name="submissionType" checked={activeTab === 'problem'} onChange={() => setActiveTab('problem')} style={{ width: '24px', height: '24px', accentColor: 'var(--jspl-blue)' }} />
               <div>
-                <strong style={{ fontSize: '1.2rem', color: 'var(--jspl-blue)', display: 'block' }}>Repetitive Problem</strong>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Why-Why analysis, action taken table</span>
+                <strong style={{ fontSize: '1.1rem', color: 'var(--jspl-blue)', display: 'block' }}>Repetitive Problem</strong>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>5-Why Analysis</span>
+              </div>
+            </label>
+            <label style={{ flex: 1, minWidth: '200px', border: activeTab === 'supporting-slide' ? '2px solid var(--jspl-blue)' : '1px solid var(--glass-border)', borderRadius: '8px', padding: '1rem', cursor: 'pointer', backgroundColor: activeTab === 'supporting-slide' ? 'rgba(74,144,226,0.1)' : 'var(--bg-main)', display: 'flex', alignItems: 'center', gap: '1rem', transition: 'all 0.2s' }}>
+              <input type="radio" name="submissionType" checked={activeTab === 'supporting-slide'} onChange={() => setActiveTab('supporting-slide')} style={{ width: '24px', height: '24px', accentColor: 'var(--jspl-blue)' }} />
+              <div>
+                <strong style={{ fontSize: '1.1rem', color: 'var(--jspl-blue)', display: 'block' }}>Supporting Slide</strong>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Custom table & pictures</span>
               </div>
             </label>
           </div>
@@ -281,7 +295,7 @@ export default function SubmitPage() {
               <input type="file" className="input-field" accept="image/*" onChange={(e) => setSupportingImage(e.target.files?.[0] || null)} />
             </div>
           </>
-        ) : (
+        ) : activeTab === "problem" ? (
           <>
             <div className="form-group">
               <label>Equipment Details</label>
@@ -332,6 +346,77 @@ export default function SubmitPage() {
               <input type="file" className="input-field" accept="image/*" onChange={(e) => setSupportingImage(e.target.files?.[0] || null)} />
             </div>
           </>
+        ) : (
+          <>
+            <div className="form-group">
+              <label>Select Category</label>
+              <select className="input-field" value={supportingSlideType} onChange={(e) => setSupportingSlideType(e.target.value as any)}>
+                <option value="BestPractice">Best Practice</option>
+                <option value="RepetitiveProblem">Repetitive Problem</option>
+              </select>
+            </div>
+            
+            <label className="section-label">Custom Table</label>
+            <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                <tbody>
+                  {customTable.map((row, rIdx) => (
+                    <tr key={rIdx}>
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} style={{ position: 'relative', border: '1px solid var(--glass-border)', padding: '0' }}>
+                          <input 
+                            type="text" 
+                            className="input-field"
+                            value={cell} 
+                            onChange={e => {
+                              const newTable = [...customTable];
+                              newTable[rIdx][cIdx] = e.target.value;
+                              setCustomTable(newTable);
+                            }} 
+                            style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                          />
+                          {rIdx === 0 && customTable[0].length > 1 && (
+                            <button 
+                              type="button" 
+                              onClick={() => removeCustomCol(cIdx)} 
+                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              - Col
+                            </button>
+                          )}
+                        </td>
+                      ))}
+                      {customTable.length > 1 && (
+                        <td style={{ width: '40px', textAlign: 'center' }}>
+                          <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => removeCustomRow(rIdx)}><X size={14}/></button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={addCustomRow}><Plus size={14}/> Add Row</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={addCustomCol}><Plus size={14}/> Add Column</button>
+              </div>
+            </div>
+
+            <label className="section-label" style={{ marginTop: '1rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Upload Pictures (Up to 3)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div className="form-group">
+                <label>Picture 1</label>
+                <input type="file" className="input-field" accept="image/*" onChange={(e) => setSuppImg1(e.target.files?.[0] || null)} />
+              </div>
+              <div className="form-group">
+                <label>Picture 2</label>
+                <input type="file" className="input-field" accept="image/*" onChange={(e) => setSuppImg2(e.target.files?.[0] || null)} />
+              </div>
+              <div className="form-group">
+                <label>Picture 3</label>
+                <input type="file" className="input-field" accept="image/*" onChange={(e) => setSuppImg3(e.target.files?.[0] || null)} />
+              </div>
+            </div>
+          </>
         )}
         <div className="form-actions" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
           <button type="button" className="btn" style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid var(--jspl-blue)', color: 'var(--jspl-blue)' }} onClick={(e) => handleSubmit(e, "Draft")} disabled={loading}>
@@ -346,5 +431,13 @@ export default function SubmitPage() {
       </>
       )}
     </div>
+  );
+}
+
+export default function SubmitPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading form...</div>}>
+      <SubmitPageContent />
+    </Suspense>
   );
 }

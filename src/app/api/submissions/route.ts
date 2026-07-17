@@ -54,9 +54,14 @@ export async function POST(req: Request) {
         // Problem
         equipmentDetails: data.equipmentDetails,
         problemStatement: data.problemStatement,
-        impactCalculation: data.impactCalculation ? JSON.stringify(data.impactCalculation) : null,
-        whyWhyAnalysis: data.whyWhyAnalysis ? JSON.stringify(data.whyWhyAnalysis) : null,
-        actionTakenTable: data.actionTakenTable ? JSON.stringify(data.actionTakenTable) : null,
+        impactCalculation: data.impactCalculation,
+        whyWhyAnalysis: data.whyWhyAnalysis,
+        actionTakenTable: data.actionTakenTable,
+
+        // Supporting Slide
+        supportingSlideType: data.supportingSlideType,
+        customTable: data.customTable,
+        supportingImages: data.supportingImages || [],
       }
     });
 
