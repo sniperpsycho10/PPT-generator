@@ -12,6 +12,7 @@ function SubmitPageContent() {
 
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(!!editId);
   const [activeTab, setActiveTab] = useState<"best-practice" | "problem" | "supporting-slide">("best-practice");
+  const [pendingSubmissionType, setPendingSubmissionType] = useState<"BestPractice" | "RepetitiveProblem" | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -26,7 +27,7 @@ function SubmitPageContent() {
   // Problem fields
   const [equipmentDetails, setEquipmentDetails] = useState("");
   const [problemStatement, setProblemStatement] = useState("");
-  const [whyWhyAnalysis, setWhyWhyAnalysis] = useState(["", "", "", "", ""]);
+  const [whyWhyAnalysis, setWhyWhyAnalysis] = useState([""]);
   const [impactCalculation, setImpactCalculation] = useState([{ parameter: "", value: "", calculation: "" }]);
   const [actionTakenTable, setActionTakenTable] = useState([{ action: "", target: "", status: "" }]);
   
@@ -124,67 +125,96 @@ function SubmitPageContent() {
     setCustomTable(customTable.map(row => row.filter((_, i) => i !== idx)));
   };
 
+  const submitSingle = async (payload: any, submitStatus: string) => {
+    const url = editId ? `/api/submissions/${editId}` : "/api/submissions";
+    const method = editId ? "PUT" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || "Failed");
+    }
+    return res;
+  };
+
   const handleSubmit = async (e: React.FormEvent, submitStatus: "Draft" | "Submitted") => {
     e.preventDefault();
     setLoading(true);
 
-    const payload: any = {
-      type: activeTab === "best-practice" ? "BestPractice" : (activeTab === "problem" ? "RepetitiveProblem" : "SupportingSlide"),
-      title,
-      description: activeTab === "best-practice" ? methodology : (activeTab === "problem" ? problemStatement : "Supporting slide"),
-      status: submitStatus,
-      
-      // Best Practice
-      objective,
-      problemAddressed,
-      methodology,
-      impactSavings: parseFloat(impactSavings) || 0,
-      calculationTable: JSON.stringify(calculationTable),
-      
-      // Problem
-      equipmentDetails,
-      problemStatement,
-      whyWhyAnalysis: JSON.stringify(whyWhyAnalysis),
-      impactCalculation: JSON.stringify(impactCalculation),
-      actionTakenTable: JSON.stringify(actionTakenTable),
-      
-      // Supporting Slide
-      supportingSlideType,
-      customTable: JSON.stringify(customTable),
-      supportingImages: []
-    };
-
-    if (activeTab === "supporting-slide") {
-      let i1 = ""; let i2 = ""; let i3 = "";
-      if (suppImg1) i1 = await uploadImage(suppImg1) || "";
-      if (suppImg2) i2 = await uploadImage(suppImg2) || "";
-      if (suppImg3) i3 = await uploadImage(suppImg3) || "";
-      payload.supportingImages = [i1, i2, i3].filter(Boolean);
-    } else {
-      if (beforeImage) payload.beforeImageUrl = await uploadImage(beforeImage) || "";
-      if (afterImage) payload.afterImageUrl = await uploadImage(afterImage) || "";
-      if (supportingImage) payload.attachmentUrl = await uploadImage(supportingImage) || "";
-    }
-
     try {
-      const url = editId ? `/api/submissions/${editId}` : "/api/submissions";
-      const method = editId ? "PUT" : "POST";
-      
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if(res.ok) {
-        alert(editId ? `Successfully updated as ${submitStatus}!` : `Successfully saved as ${submitStatus}!`);
-        router.push("/dashboard");
+      if (!editId && activeTab === "supporting-slide" && pendingSubmissionType) {
+        // Submit Parent
+        const parentPayload: any = {
+          type: pendingSubmissionType,
+          title,
+          description: pendingSubmissionType === "BestPractice" ? methodology : problemStatement,
+          status: submitStatus,
+          objective, problemAddressed, methodology, impactSavings: parseFloat(impactSavings) || 0, calculationTable: JSON.stringify(calculationTable),
+          equipmentDetails, problemStatement, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
+          supportingSlideType: pendingSubmissionType, customTable: "[]", supportingImages: []
+        };
+        if (beforeImage) parentPayload.beforeImageUrl = await uploadImage(beforeImage) || "";
+        if (afterImage) parentPayload.afterImageUrl = await uploadImage(afterImage) || "";
+        if (supportingImage) parentPayload.attachmentUrl = await uploadImage(supportingImage) || "";
+        
+        await submitSingle(parentPayload, submitStatus);
+
+        // Submit Supporting Slide
+        const ssPayload: any = {
+          type: "SupportingSlide",
+          title: `Supporting Doc: ${title}`,
+          description: "Supporting slide",
+          status: submitStatus,
+          objective, problemAddressed, methodology, impactSavings: 0, calculationTable: "[]",
+          equipmentDetails, problemStatement, whyWhyAnalysis: "[]", impactCalculation: "[]", actionTakenTable: "[]",
+          supportingSlideType: pendingSubmissionType,
+          customTable: JSON.stringify(customTable),
+          supportingImages: []
+        };
+        let i1 = ""; let i2 = ""; let i3 = "";
+        if (suppImg1) i1 = await uploadImage(suppImg1) || "";
+        if (suppImg2) i2 = await uploadImage(suppImg2) || "";
+        if (suppImg3) i3 = await uploadImage(suppImg3) || "";
+        ssPayload.supportingImages = [i1, i2, i3].filter(Boolean);
+
+        await submitSingle(ssPayload, submitStatus);
+
       } else {
-        const errData = await res.json();
-        alert("Error saving data: " + errData.error);
+        // Normal Single Submission
+        const payload: any = {
+          type: activeTab === "best-practice" ? "BestPractice" : (activeTab === "problem" ? "RepetitiveProblem" : "SupportingSlide"),
+          title,
+          description: activeTab === "best-practice" ? methodology : (activeTab === "problem" ? problemStatement : "Supporting slide"),
+          status: submitStatus,
+          objective, problemAddressed, methodology, impactSavings: parseFloat(impactSavings) || 0, calculationTable: JSON.stringify(calculationTable),
+          equipmentDetails, problemStatement, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
+          supportingSlideType, customTable: JSON.stringify(customTable), supportingImages: []
+        };
+
+        if (activeTab === "supporting-slide") {
+          let i1 = ""; let i2 = ""; let i3 = "";
+          if (suppImg1) i1 = await uploadImage(suppImg1) || "";
+          if (suppImg2) i2 = await uploadImage(suppImg2) || "";
+          if (suppImg3) i3 = await uploadImage(suppImg3) || "";
+          payload.supportingImages = [i1, i2, i3].filter(Boolean);
+        } else {
+          if (beforeImage) payload.beforeImageUrl = await uploadImage(beforeImage) || "";
+          if (afterImage) payload.afterImageUrl = await uploadImage(afterImage) || "";
+          if (supportingImage) payload.attachmentUrl = await uploadImage(supportingImage) || "";
+        }
+        
+        await submitSingle(payload, submitStatus);
       }
-    } catch(err) {
-      alert("Network Error");
+
+      alert(editId ? `Successfully updated as ${submitStatus}!` : `Successfully saved as ${submitStatus}!`);
+      router.push("/dashboard");
+    } catch (err: any) {
+      alert("Error saving data: " + err.message);
     }
+    
     setLoading(false);
   };
 
@@ -317,12 +347,16 @@ function SubmitPageContent() {
             ))}
             <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setImpactCalculation([...impactCalculation, {parameter: "", value: "", calculation: ""}])}>+ Add Impact Row</button>
             
-            <label className="section-label">5-Why Analysis</label>
+            <label className="section-label">Why-Why Analysis</label>
             {whyWhyAnalysis.map((why, idx) => (
-              <div className="form-group" key={idx}>
-                <input type="text" className="input-field" placeholder={`Why ${idx + 1}?`} value={why} onChange={(e) => handleWhyChange(idx, e.target.value)} />
+              <div className="form-group" key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input type="text" className="input-field" style={{ flex: 1 }} placeholder={`Why ${idx + 1}?`} value={why} onChange={(e) => handleWhyChange(idx, e.target.value)} />
+                {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setWhyWhyAnalysis(whyWhyAnalysis.filter((_, i) => i !== idx))}>X</button>}
               </div>
             ))}
+            {whyWhyAnalysis.length < 8 && (
+              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setWhyWhyAnalysis([...whyWhyAnalysis, ""])}>+ Add Why</button>
+            )}
 
             <label className="section-label">Action Taken Table</label>
             {actionTakenTable.map((row, idx) => (
@@ -419,13 +453,35 @@ function SubmitPageContent() {
           </>
         )}
         <div className="form-actions" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-          <button type="button" className="btn" style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid var(--jspl-blue)', color: 'var(--jspl-blue)' }} onClick={(e) => handleSubmit(e, "Draft")} disabled={loading}>
-            {loading ? "Saving..." : "Save as Draft"}
-          </button>
-          
-          <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={(e) => handleSubmit(e, "Submitted")} disabled={loading}>
-            {loading ? (editId ? "Updating..." : "Submitting...") : (editId ? "Update Submission" : "Final Submit")}
-          </button>
+          {activeTab === "best-practice" && !editId ? (
+            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
+              setPendingSubmissionType("BestPractice");
+              setSupportingSlideType("BestPractice");
+              setActiveTab("supporting-slide");
+            }}>
+              Next: Add Supporting Slide (Mandatory)
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn" style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid var(--jspl-blue)', color: 'var(--jspl-blue)' }} onClick={(e) => handleSubmit(e, "Draft")} disabled={loading}>
+                {loading ? "Saving..." : "Save as Draft"}
+              </button>
+              
+              <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={(e) => handleSubmit(e, "Submitted")} disabled={loading}>
+                {loading ? (editId ? "Updating..." : "Submitting...") : (editId ? "Update Submission" : "Final Submit")}
+              </button>
+
+              {activeTab === "problem" && !editId && (
+                <button type="button" className="btn" style={{ flex: 1, backgroundColor: '#e3f2fd', color: 'var(--jspl-blue)' }} onClick={() => {
+                  setPendingSubmissionType("RepetitiveProblem");
+                  setSupportingSlideType("RepetitiveProblem");
+                  setActiveTab("supporting-slide");
+                }}>
+                  Next: Add Supporting Slide (Optional)
+                </button>
+              )}
+            </>
+          )}
         </div>
       </form>
       </>

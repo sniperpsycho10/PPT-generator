@@ -34,6 +34,11 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
         Submissions
       </Link>
       
+      <Link href="/dashboard/best-practices" className={getClassName("/dashboard/best-practices")}>
+        <CheckSquare size={18} />
+        Best Practices Library
+      </Link>
+      
       <Link href="/dashboard/submit-suggestion" className={getClassName("/dashboard/submit-suggestion")}>
         <MessageSquarePlus size={18} />
         Submit Suggestion
