@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         problemAddressed: data.problemAddressed,
         methodology: data.methodology,
         impactSavings: data.impactSavings ? parseFloat(data.impactSavings) : null,
-        calculationTable: data.calculationTable ? JSON.stringify(data.calculationTable) : null,
+        calculationTable: data.calculationTable,
         
         // Problem
         equipmentDetails: data.equipmentDetails,

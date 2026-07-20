@@ -7,13 +7,15 @@ import { Send, X, CheckCircle2 } from "lucide-react";
 interface Props {
   userName: string;
   userDept: string;
+  repetitiveProblems: { id: string; title: string }[];
 }
 
-export default function SubmitSuggestionClient({ userName, userDept }: Props) {
+export default function SubmitSuggestionClient({ userName, userDept, repetitiveProblems }: Props) {
   const router = useRouter();
   const [name, setName] = useState(userName);
   const [dept, setDept] = useState(userDept);
   const [suggestion, setSuggestion] = useState("");
+  const [submissionId, setSubmissionId] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +35,7 @@ export default function SubmitSuggestionClient({ userName, userDept }: Props) {
       const res = await fetch("/api/suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName: name, guestDept: dept, suggestionText: suggestion })
+        body: JSON.stringify({ guestName: name, guestDept: dept, suggestionText: suggestion, submissionId })
       });
 
       if (res.ok) {
@@ -85,6 +87,21 @@ export default function SubmitSuggestionClient({ userName, userDept }: Props) {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <label style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Related Problem (Optional)</label>
+            <select 
+              className="input-field" 
+              style={{ padding: '0.8rem', backgroundColor: 'var(--input-bg)', borderRadius: '8px' }}
+              value={submissionId} 
+              onChange={e => setSubmissionId(e.target.value)}
+            >
+              <option value="">General Suggestion (No specific problem)</option>
+              {repetitiveProblems.map(p => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+          </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label style={{ fontWeight: '600', color: 'var(--text-primary)' }}>Suggestion / Insight <span style={{ color: '#e74c3c' }}>*</span></label>

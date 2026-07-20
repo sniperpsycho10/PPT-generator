@@ -66,6 +66,17 @@ export async function POST(req: Request) {
       }
     });
 
+    if (memberIds && memberIds.length > 0) {
+      await prisma.notification.createMany({
+        data: memberIds.map((id: string) => ({
+          userId: id,
+          title: "Added to Team",
+          message: `You have been added to the team: ${name.trim()}`,
+          link: "/dashboard"
+        }))
+      });
+    }
+
     return NextResponse.json({ success: true, data: newTeam });
   } catch (error: any) {
     console.error("Failed to create team:", error);

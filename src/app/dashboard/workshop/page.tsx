@@ -400,19 +400,28 @@ export default function WorkshopMode() {
               <>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>CUSTOM TABLE</div>
-                  <div style={{ overflowX: 'auto', flex: 1 }}>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: '60vh' }}>
                     <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
                       <tbody>
                         {(() => {
                           try {
                             const table = JSON.parse(currentSlide.customTable || "[]");
-                            return table.map((r: string[], i: number) => (
-                              <tr key={i}>
-                                {r.map((c: string, j: number) => (
-                                  <td key={j} style={{ padding: '6px', border: `1px solid ${t.accent}`, textAlign: 'center', backgroundColor: i === 0 ? t.accent : 'transparent', color: i === 0 ? 'white' : 'inherit', fontWeight: i === 0 ? 'bold' : 'normal' }}>{c}</td>
-                                ))}
-                              </tr>
-                            ));
+                            if (Array.isArray(table) && table.length > 0) {
+                              const numCols = Math.max(...table.map((r: any[]) => r?.length || 0));
+                              return table.map((row: string[], i: number) => {
+                                const isHeader = i === 0;
+                                const paddedRow = Array.isArray(row) ? [...row] : [];
+                                while(paddedRow.length < numCols) paddedRow.push("");
+                                return (
+                                  <tr key={i}>
+                                    {paddedRow.map((c: string, j: number) => (
+                                      <td key={j} style={{ padding: '6px', border: `1px solid ${t.accent}`, textAlign: 'center', backgroundColor: isHeader ? t.accent : 'transparent', color: isHeader ? 'white' : 'inherit', fontWeight: isHeader ? 'bold' : 'normal' }}>{String(c || '')}</td>
+                                    ))}
+                                  </tr>
+                                );
+                              });
+                            }
+                            return null;
                           } catch(e) { return null; }
                         })()}
                       </tbody>
@@ -428,33 +437,65 @@ export default function WorkshopMode() {
             {currentSlide.type === "BestPractice" ? (
               <>
                 {currentSlide.calculationTable && (
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <div style={{ color: t.heading, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>CALCULATION TABLE</div>
-                    <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#6366F1', color: 'white' }}>
-                          <th style={{ padding: '4px', border: '1px solid white' }}>Metric</th>
-                          <th style={{ padding: '4px', border: '1px solid white' }}>Before</th>
-                          <th style={{ padding: '4px', border: '1px solid white' }}>After</th>
-                          <th style={{ padding: '4px', border: '1px solid white' }}>Gain</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          try {
-                            const table = JSON.parse(currentSlide.calculationTable);
-                            return table.map((r: any, i: number) => (
-                              <tr key={i}>
-                                <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{r.metric}</td>
-                                <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{r.before}</td>
-                                <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{r.after}</td>
-                                <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{r.gain}</td>
-                              </tr>
-                            ));
-                          } catch(e) { return null; }
-                        })()}
-                      </tbody>
-                    </table>
+                    <div style={{ width: '100%', overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
+                          {(() => {
+                            try {
+                              const parsedTable = JSON.parse(currentSlide.calculationTable);
+                              if (Array.isArray(parsedTable) && parsedTable.length > 0) {
+                                const isLegacy = !Array.isArray(parsedTable[0]);
+                                if (isLegacy) {
+                                  return (
+                                    <>
+                                    <thead>
+                                      <tr style={{ backgroundColor: '#6366F1', color: 'white' }}>
+                                        <th style={{ padding: '4px', border: '1px solid white' }}>Metric</th>
+                                        <th style={{ padding: '4px', border: '1px solid white' }}>Before</th>
+                                        <th style={{ padding: '4px', border: '1px solid white' }}>After</th>
+                                        <th style={{ padding: '4px', border: '1px solid white' }}>Gain</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {parsedTable.map((r: any, i: number) => (
+                                        <tr key={i}>
+                                          <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{String(r.metric || '')}</td>
+                                          <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{String(r.before || '')}</td>
+                                          <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{String(r.after || '')}</td>
+                                          <td style={{ padding: '4px', border: '1px solid white', textAlign: 'center' }}>{String(r.gain || '')}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    </>
+                                  );
+                                } else {
+                                  const numCols = Math.max(...parsedTable.map((r: any[]) => r?.length || 0));
+                                  return (
+                                    <tbody>
+                                      {parsedTable.map((row: string[], i: number) => {
+                                        const isHeader = i === 0;
+                                        const paddedRow = Array.isArray(row) ? [...row] : [];
+                                        while(paddedRow.length < numCols) paddedRow.push("");
+                                        return (
+                                          <tr key={i}>
+                                            {paddedRow.map((c: string, j: number) => (
+                                              <td key={j} style={{ padding: '4px', border: '1px solid white', textAlign: 'center', backgroundColor: isHeader ? '#6366F1' : 'transparent', color: isHeader ? 'white' : 'inherit', fontWeight: isHeader ? 'bold' : 'normal' }}>
+                                                {String(c || '')}
+                                              </td>
+                                            ))}
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  );
+                                }
+                              }
+                              return null;
+                            } catch(e) { return null; }
+                          })()}
+                      </table>
+                    </div>
                   </div>
                 )}
                 <div style={{ flex: 1 }}>
@@ -483,6 +524,7 @@ export default function WorkshopMode() {
                     <thead>
                       <tr style={{ backgroundColor: '#4A90E2', color: 'white' }}>
                         <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Action Taken / Planned</th>
+                        <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Target</th>
                         <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Status</th>
                       </tr>
                     </thead>
@@ -492,8 +534,9 @@ export default function WorkshopMode() {
                           const table = JSON.parse(currentSlide.actionTakenTable || "[]");
                           return table.map((r: any, i: number) => (
                             <tr key={i}>
-                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{r.action}</td>
-                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{r.status}</td>
+                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.action || '')}</td>
+                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.target || '')}</td>
+                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.status || '')}</td>
                             </tr>
                           ));
                         } catch(e) { return null; }
@@ -505,27 +548,52 @@ export default function WorkshopMode() {
                 <div style={{ backgroundColor: templateStyle === 'dark' ? '#111' : '#EAF4F4', border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>IMPACT CALCULATION</div>
                   <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: t.accent, color: 'white' }}>
-                        <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Parameter</th>
-                        <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Value</th>
-                        <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Calculation</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        try {
-                          const table = JSON.parse(currentSlide.impactCalculation || "[]");
-                          return table.map((r: any, i: number) => (
-                            <tr key={i}>
-                              <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}` }}>{r.parameter}</td>
-                              <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}`, fontWeight: 'bold' }}>{r.value}</td>
-                              <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}` }}>{r.calculation}</td>
-                            </tr>
-                          ));
-                        } catch(e) { return null; }
-                      })()}
-                    </tbody>
+                    {(() => {
+                      try {
+                        const table = JSON.parse(currentSlide.impactCalculation || "[]");
+                        if (!table || table.length === 0) return null;
+                        const isLegacy = !Array.isArray(table[0]);
+                        if (isLegacy) {
+                          return (
+                            <>
+                              <thead>
+                                <tr style={{ backgroundColor: t.accent, color: 'white' }}>
+                                  <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Parameter</th>
+                                  <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Value</th>
+                                  <th style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>Calculation</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {table.map((r: any, i: number) => (
+                                  <tr key={i}>
+                                    <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}` }}>{String(r.parameter || '')}</td>
+                                    <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}`, fontWeight: 'bold' }}>{String(r.value || '')}</td>
+                                    <td style={{ padding: '2px 4px', border: `1px solid ${t.accent}` }}>{String(r.calculation || r.calculate || '')}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </>
+                          );
+                        } else {
+                          return (
+                            <>
+                              <thead>
+                                <tr style={{ backgroundColor: t.accent, color: 'white' }}>
+                                  {table[0].map((h: string, i: number) => <th key={i} style={{ padding: '2px 4px', textAlign: 'left', border: `1px solid ${t.accent}` }}>{h}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {table.slice(1).map((r: string[], i: number) => (
+                                  <tr key={i}>
+                                    {r.map((c: string, j: number) => <td key={j} style={{ padding: '2px 4px', border: `1px solid ${t.accent}`, fontWeight: j === 1 ? 'bold' : 'normal' }}>{c}</td>)}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </>
+                          );
+                        }
+                      } catch(e) { return null; }
+                    })()}
                   </table>
                 </div>
 

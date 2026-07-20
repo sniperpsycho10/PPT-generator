@@ -21,5 +21,12 @@ export default async function FeedbackPage() {
     }
   }
 
-  return <FeedbackClient loggedInUser={user} />;
+  
+  const repetitiveProblems = await prisma.submission.findMany({
+    where: { type: "RepetitiveProblem", status: "Accepted" },
+    select: { id: true, title: true }
+  });
+
+  return <FeedbackClient loggedInUser={user} repetitiveProblems={repetitiveProblems} />;
+
 }

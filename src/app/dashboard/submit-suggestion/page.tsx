@@ -22,5 +22,12 @@ export default async function SubmitSuggestionPage() {
     redirect("/auth/login");
   }
 
-  return <SubmitSuggestionClient userName={dbUser.name || ""} userDept={dbUser.department?.name || ""} />;
+  
+  const repetitiveProblems = await prisma.submission.findMany({
+    where: { type: "RepetitiveProblem", status: "Accepted" },
+    select: { id: true, title: true }
+  });
+
+  return <SubmitSuggestionClient userName={dbUser.name || ""} userDept={dbUser.department?.name || ""} repetitiveProblems={repetitiveProblems} />;
+
 }

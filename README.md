@@ -76,3 +76,4 @@ npm run dev -- -p 4000
 - **Database**: PostgreSQL orchestrated via Prisma ORM.
 - **PPT Generation**: `PptxGenJS`
 - **QR Codes**: `qrcode` & `qrcode.react` (Fully local, no external APIs used).
+

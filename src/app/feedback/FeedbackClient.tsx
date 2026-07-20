@@ -7,15 +7,17 @@ import "../auth/login/login.css";
 
 interface Props {
   loggedInUser: { name: string; department: string | null } | null;
+  repetitiveProblems: { id: string; title: string }[];
 }
 
-export default function FeedbackClient({ loggedInUser }: Props) {
+export default function FeedbackClient({ loggedInUser, repetitiveProblems }: Props) {
   const searchParams = useSearchParams();
   const isSuccess = searchParams.get("success") === "true";
   
   const [name, setName] = useState(loggedInUser?.name || "");
   const [dept, setDept] = useState(loggedInUser?.department || "");
   const [suggestion, setSuggestion] = useState("");
+  const [submissionId, setSubmissionId] = useState("");
   const [submitted, setSubmitted] = useState(isSuccess);
   const [loading, setLoading] = useState(false);
 
@@ -120,6 +122,16 @@ export default function FeedbackClient({ loggedInUser }: Props) {
                 </div>
               </>
             )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontWeight: '600', fontSize: '0.9rem', color: '#f8fafc' }}>Related Problem (Optional)</label>
+              <select name="submissionId" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', outline: 'none' }} value={submissionId} onChange={e => setSubmissionId(e.target.value)}>
+                <option value="" style={{ color: 'black' }}>General Suggestion (No specific problem)</option>
+                {repetitiveProblems.map(p => (
+                  <option key={p.id} value={p.id} style={{ color: 'black' }}>{p.title}</option>
+                ))}
+              </select>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontWeight: '600', fontSize: '0.9rem', color: '#f8fafc' }}>Suggestion / Insight <span style={{ color: '#ef4444' }}>*</span></label>

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, Suspense } from "react";
 import "./submit.css";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Upload } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 function SubmitPageContent() {
   const router = useRouter();
@@ -14,6 +15,7 @@ function SubmitPageContent() {
   const [activeTab, setActiveTab] = useState<"best-practice" | "problem" | "supporting-slide">("best-practice");
   const [pendingSubmissionType, setPendingSubmissionType] = useState<"BestPractice" | "RepetitiveProblem" | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fileImportTarget, setFileImportTarget] = useState<"calculation" | "impact" | "action" | "custom" | null>(null);
 
   const [title, setTitle] = useState("");
   
@@ -22,14 +24,17 @@ function SubmitPageContent() {
   const [problemAddressed, setProblemAddressed] = useState("");
   const [methodology, setMethodology] = useState("");
   const [impactSavings, setImpactSavings] = useState("");
-  const [calculationTable, setCalculationTable] = useState([{ metric: "", before: "", after: "", gain: "" }]);
+  const [calculationTable, setCalculationTable] = useState<any[]>([
+    ["Metric", "Before", "After", "Gain"],
+    ["", "", "", ""]
+  ]);
   
   // Problem fields
   const [equipmentDetails, setEquipmentDetails] = useState("");
   const [problemStatement, setProblemStatement] = useState("");
   const [whyWhyAnalysis, setWhyWhyAnalysis] = useState([""]);
-  const [impactCalculation, setImpactCalculation] = useState([{ parameter: "", value: "", calculation: "" }]);
-  const [actionTakenTable, setActionTakenTable] = useState([{ action: "", target: "", status: "" }]);
+  const [impactCalculation, setImpactCalculation] = useState<any[]>(() => [["Parameter (e.g. Tripping Freq)", "Value", "Calculation"], ["", "", ""]]);
+  const [actionTakenTable, setActionTakenTable] = useState<any[]>(() => [["Action Taken / Planned", "Target (e.g. Shutdown)", "Status"], ["", "", ""]]);
   
   // Supporting Slide fields
   const [supportingSlideType, setSupportingSlideType] = useState<"BestPractice" | "RepetitiveProblem">("BestPractice");
@@ -61,20 +66,20 @@ function SubmitPageContent() {
                setActiveTab("problem");
                setEquipmentDetails(data.equipmentDetails || "");
                setProblemStatement(data.problemStatement || "");
-               try { if (data.whyWhyAnalysis) setWhyWhyAnalysis(JSON.parse(data.whyWhyAnalysis)); } catch(e){}
-               try { if (data.impactCalculation) setImpactCalculation(JSON.parse(data.impactCalculation)); } catch(e){}
-               try { if (data.actionTakenTable) setActionTakenTable(JSON.parse(data.actionTakenTable)); } catch(e){}
+               try { const parsed = JSON.parse(data.whyWhyAnalysis); if(Array.isArray(parsed)) setWhyWhyAnalysis(parsed); } catch(e){}
+               try { const parsed = JSON.parse(data.impactCalculation); if(Array.isArray(parsed)) setImpactCalculation(parsed); } catch(e){}
+               try { const parsed = JSON.parse(data.actionTakenTable); if(Array.isArray(parsed)) setActionTakenTable(parsed); } catch(e){}
              } else if (data.type === "SupportingSlide") {
                setActiveTab("supporting-slide");
                setSupportingSlideType(data.supportingSlideType || "BestPractice");
-               try { if (data.customTable) setCustomTable(JSON.parse(data.customTable)); } catch(e){}
+               try { const parsed = JSON.parse(data.customTable); if(Array.isArray(parsed)) setCustomTable(parsed); } catch(e){}
              } else {
                setActiveTab("best-practice");
                setObjective(data.objective || "");
                setProblemAddressed(data.problemAddressed || "");
                setMethodology(data.methodology || "");
                setImpactSavings(data.impactSavings ? data.impactSavings.toString() : "");
-               try { if (data.calculationTable) setCalculationTable(JSON.parse(data.calculationTable)); } catch(e){}
+               try { const parsed = JSON.parse(data.calculationTable); if(Array.isArray(parsed)) setCalculationTable(parsed); } catch(e){}
              }
           }
         })
@@ -125,6 +130,86 @@ function SubmitPageContent() {
     setCustomTable(customTable.map(row => row.filter((_, i) => i !== idx)));
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !fileImportTarget) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result as string;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as string[][];
+
+        if (!data || data.length === 0) {
+          alert("File is empty or invalid format.");
+          return;
+        }
+
+        if (fileImportTarget === "calculation") {
+          const stringData = data.filter(row => row.length > 0).map(row => 
+            row.map(cell => cell?.toString() || "")
+          );
+          if (stringData.length > 0) {
+            const maxCols = Math.max(...stringData.map(r => r.length));
+            const paddedData = stringData.map(r => {
+              const newRow = [...r];
+              while (newRow.length < maxCols) newRow.push("");
+              return newRow;
+            });
+            setCalculationTable(paddedData);
+          }
+        } else if (fileImportTarget === "impact") {
+          const stringData = data.filter((row: any[]) => row.length > 0).map((row: any[]) => 
+            row.map(cell => cell?.toString() || "")
+          );
+          if (stringData.length > 0) {
+            const maxCols = Math.max(...stringData.map((r: any[]) => r.length));
+            const paddedData = stringData.map((r: any[]) => {
+              const newRow = [...r];
+              while (newRow.length < maxCols) newRow.push("");
+              return newRow;
+            });
+            setImpactCalculation(paddedData);
+          }
+        } else if (fileImportTarget === "action") {
+          const stringData = data.filter((row: any[]) => row.length > 0).map((row: any[]) => 
+            row.map(cell => cell?.toString() || "")
+          );
+          if (stringData.length > 0) {
+            const maxCols = Math.max(...stringData.map((r: any[]) => r.length));
+            const paddedData = stringData.map((r: any[]) => {
+              const newRow = [...r];
+              while (newRow.length < maxCols) newRow.push("");
+              return newRow;
+            });
+            setActionTakenTable(paddedData);
+          }
+        } else if (fileImportTarget === "custom") {
+          const stringData = data.filter(row => row.length > 0).map(row => 
+            row.map(cell => cell?.toString() || "")
+          );
+          if (stringData.length > 0) {
+            const maxCols = Math.max(...stringData.map(r => r.length));
+            const paddedData = stringData.map(r => {
+              const newRow = [...r];
+              while (newRow.length < maxCols) newRow.push("");
+              return newRow;
+            });
+            setCustomTable(paddedData);
+          }
+        }
+      } catch (err) {
+        alert("Error parsing file. Please ensure it is a valid CSV or XLSX.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = "";
+    setFileImportTarget(null);
+  };
+
   const submitSingle = async (payload: any, submitStatus: string) => {
     const url = editId ? `/api/submissions/${editId}` : "/api/submissions";
     const method = editId ? "PUT" : "POST";
@@ -146,7 +231,6 @@ function SubmitPageContent() {
 
     try {
       if (!editId && activeTab === "supporting-slide" && pendingSubmissionType) {
-        // Submit Parent
         const parentPayload: any = {
           type: pendingSubmissionType,
           title,
@@ -162,7 +246,6 @@ function SubmitPageContent() {
         
         await submitSingle(parentPayload, submitStatus);
 
-        // Submit Supporting Slide
         const ssPayload: any = {
           type: "SupportingSlide",
           title: `Supporting Doc: ${title}`,
@@ -183,7 +266,6 @@ function SubmitPageContent() {
         await submitSingle(ssPayload, submitStatus);
 
       } else {
-        // Normal Single Submission
         const payload: any = {
           type: activeTab === "best-practice" ? "BestPractice" : (activeTab === "problem" ? "RepetitiveProblem" : "SupportingSlide"),
           title,
@@ -224,6 +306,8 @@ function SubmitPageContent() {
         <h1>{editId ? "Edit Submission" : "Monthly Workshop Submission"}</h1>
         <p>{editId ? "Update your previously submitted details" : "Submit your department's monthly data for the presentation"}</p>
       </div>
+
+      <input type="file" id="tableImportInput" style={{ display: 'none' }} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileUpload} />
 
       {isPreviewMode ? (
         <div className="preview-container glass" style={{ padding: '2rem', borderRadius: '12px' }}>
@@ -298,16 +382,61 @@ function SubmitPageContent() {
             </div>
             
             <label className="section-label">Calculation Table (Metrics)</label>
-            {calculationTable.map((row, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input type="text" className="input-field" placeholder="Metric (e.g. Downtime)" value={row.metric} onChange={(e) => { const nt = [...calculationTable]; nt[idx].metric = e.target.value; setCalculationTable(nt); }} />
-                <input type="text" className="input-field" placeholder="Before" value={row.before} onChange={(e) => { const nt = [...calculationTable]; nt[idx].before = e.target.value; setCalculationTable(nt); }} />
-                <input type="text" className="input-field" placeholder="After" value={row.after} onChange={(e) => { const nt = [...calculationTable]; nt[idx].after = e.target.value; setCalculationTable(nt); }} />
-                <input type="text" className="input-field" placeholder="Gain" value={row.gain} onChange={(e) => { const nt = [...calculationTable]; nt[idx].gain = e.target.value; setCalculationTable(nt); }} />
-                {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setCalculationTable(calculationTable.filter((_, i) => i !== idx))}>X</button>}
+            <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                <tbody>
+                  {calculationTable.map((row, rIdx) => (
+                    <tr key={rIdx}>
+                      {Array.isArray(row) ? row.map((cell, cIdx) => (
+                        <td key={cIdx} style={{ position: 'relative', border: '1px solid var(--glass-border)', padding: '0' }}>
+                          <input 
+                            type="text" 
+                            className="input-field"
+                            value={cell} 
+                            onChange={e => {
+                              const newTable = [...calculationTable];
+                              newTable[rIdx] = [...newTable[rIdx]];
+                              newTable[rIdx][cIdx] = e.target.value;
+                              setCalculationTable(newTable);
+                            }} 
+                            style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                          />
+                          {rIdx === 0 && calculationTable[0].length > 1 && (
+                            <button 
+                              type="button" 
+                              onClick={() => setCalculationTable(calculationTable.map(r => Array.isArray(r) ? r.filter((_, i) => i !== cIdx) : r))} 
+                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              - Col
+                            </button>
+                          )}
+                        </td>
+                      )) : (
+                        <td colSpan={4} style={{ padding: '0.5rem', color: 'red' }}>Legacy format detected. Please re-import as spreadsheet.</td>
+                      )}
+                      {calculationTable.length > 1 && (
+                        <td style={{ width: '40px', textAlign: 'center' }}>
+                          <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setCalculationTable(calculationTable.filter((_, i) => i !== rIdx))}><X size={14}/></button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => {
+                  if (calculationTable.length === 0) setCalculationTable([[""]]);
+                  else setCalculationTable([...calculationTable, Array(calculationTable[0].length).fill("")]);
+                }}><Plus size={14}/> Add Row</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => {
+                  if (calculationTable.length === 0) setCalculationTable([[""]]);
+                  else setCalculationTable(calculationTable.map(row => Array.isArray(row) ? [...row, ""] : row));
+                }}><Plus size={14}/> Add Column</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("calculation"); document.getElementById('tableImportInput')?.click(); }}>
+                  <Upload size={14} /> Import File
+                </button>
               </div>
-            ))}
-            <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setCalculationTable([...calculationTable, {metric: "", before: "", after: "", gain: ""}])}>+ Add Metric Row</button>
+            </div>
 
             <label className="section-label" style={{ marginTop: '1rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Photos & Evidence</label>
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -345,7 +474,12 @@ function SubmitPageContent() {
                 {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setImpactCalculation(impactCalculation.filter((_, i) => i !== idx))}>X</button>}
               </div>
             ))}
-            <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setImpactCalculation([...impactCalculation, {parameter: "", value: "", calculation: ""}])}>+ Add Impact Row</button>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }} onClick={() => setImpactCalculation([...impactCalculation, {parameter: "", value: "", calculation: ""}])}>+ Add Impact Row</button>
+              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("impact"); document.getElementById('tableImportInput')?.click(); }}>
+                <Upload size={14} /> Import
+              </button>
+            </div>
             
             <label className="section-label">Why-Why Analysis</label>
             {whyWhyAnalysis.map((why, idx) => (
@@ -372,7 +506,12 @@ function SubmitPageContent() {
                 {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setActionTakenTable(actionTakenTable.filter((_, i) => i !== idx))}>X</button>}
               </div>
             ))}
-            <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setActionTakenTable([...actionTakenTable, {action: "", target: "", status: ""}])}>+ Add Action Row</button>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }} onClick={() => setActionTakenTable([...actionTakenTable, {action: "", target: "", status: ""}])}>+ Add Action Row</button>
+              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("action"); document.getElementById('tableImportInput')?.click(); }}>
+                <Upload size={14} /> Import
+              </button>
+            </div>
 
             <label className="section-label" style={{ marginTop: '1rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Supporting Evidence</label>
             <div className="form-group" style={{ marginTop: '0.5rem' }}>
@@ -429,9 +568,12 @@ function SubmitPageContent() {
                   ))}
                 </tbody>
               </table>
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={addCustomRow}><Plus size={14}/> Add Row</button>
                 <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={addCustomCol}><Plus size={14}/> Add Column</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("custom"); document.getElementById('tableImportInput')?.click(); }}>
+                  <Upload size={14} /> Import File
+                </button>
               </div>
             </div>
 

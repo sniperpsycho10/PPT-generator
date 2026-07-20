@@ -112,26 +112,11 @@ export async function POST(req: Request) {
     });
 
     // Calculate total slides to link the QR code to the final slide
-    const totalSlides = 4 + dbSubmissions.length; // 1 Cover + 1 Agenda + ... + 1 Feedback + 1 QR
-
+    
     // Generate local Base64 QR code for bulletproof offline rendering
     const qrDataUrl = await QRCode.toDataURL(`${origin}/feedback`, { width: 300, margin: 1 });
 
-    const addSmallQr = (slide: any) => {
-      // Add the image
-      slide.addImage({
-        data: qrDataUrl,
-        x: 9.2, y: 4.8, w: 0.6, h: 0.6
-      });
-      // Add invisible clickable shape over it for 100% viewer compatibility
-      slide.addShape(pptx.ShapeType.rect, {
-        x: 9.2, y: 4.8, w: 0.6, h: 0.6,
-        fill: { transparency: 100 },
-        hyperlink: { slide: totalSlides.toString() }
-      });
-    };
-
-    pptx.defineSlideMaster({
+        pptx.defineSlideMaster({
       title: "PREMIUM_MASTER",
       background: { fill: bg },
       objects: masterObjects,
@@ -151,7 +136,6 @@ export async function POST(req: Request) {
     coverSlide.addText(formattedDate.toUpperCase(), { x: 1.0, y: 1.5, w: 7, h: 0.3, fontSize: 12, color: textBody, bold: true });
     coverSlide.addText("MONTHLY MAINTENANCE WORKSHOP", { x: 1.0, y: 1.8, w: 8, h: 0.8, fontSize: 32, color: textHeading, bold: true });
     coverSlide.addText("Best Practice Sharing & Repetitive Problem Resolution", { x: 1.0, y: 2.5, w: 8, h: 0.4, fontSize: 18, color: textBody });
-    addSmallQr(coverSlide);
 
     let agendaSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
     agendaSlide.addShape(pptx.ShapeType.rect, { x: templateStyle === 'modern' ? 1.5 : 0.4, y: 0.4, w: 0.05, h: 0.4, fill: { color: accentPrimary } });
@@ -176,7 +160,6 @@ export async function POST(req: Request) {
     agendaSlide.addShape(pptx.ShapeType.roundRect, { x: 7.3, y: 1.7, ...blockStyle });
     agendaSlide.addText("🏢", { x: 7.3, y: 2.2, w: 1.8, h: 0.4, fontSize: 32, color: accentPrimary, align: "center" });
     agendaSlide.addText("HORIZONTAL\nDEPLOYMENT", { x: 7.3, y: 2.8, w: 1.8, h: 0.6, fontSize: 10, color: textHeading, bold: true, align: "center" });
-    addSmallQr(agendaSlide);
 
     dbSubmissions.forEach(sub => {
       let slide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
@@ -216,24 +199,99 @@ export async function POST(req: Request) {
         slide.addText(`Cost Impact: Approx Rs. ${sub.impactSavings || 0} Lakhs.`, { x: 0.5, y: 4.3, h: 0.4, ...textStyle });
 
         if (sub.calculationTable) {
-          slide.addText("CALCULATION TABLE", { x: 5.1, y: 1.1, w: 4.5, h: 0.2, fontSize: 9, color: textHeading, bold: true });
           try {
             const parsedTable = JSON.parse(sub.calculationTable);
-            let tableData: any[] = [
-              [{ text: "Metric", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }, 
-               { text: "Before", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }, 
-               { text: "After", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }, 
-               { text: "Gain", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }]
-            ];
-            parsedTable.forEach((row: any) => tableData.push([{text: row.metric, options: {color: textBody}}, {text: row.before, options: {color: textBody}}, {text: row.after, options: {color: textBody}}, {text: row.gain, options: {color: textBody}}]));
-            
-            slide.addTable(tableData, { 
-              x: 5.1, y: 1.3, w: 4.5, 
-              border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
-              fill: { color: cardBg }, 
-              fontSize: 9, 
-              colW: [1.8, 0.9, 0.9, 0.9]
-            });
+            if (Array.isArray(parsedTable) && parsedTable.length > 0) {
+              let isLegacy = !Array.isArray(parsedTable[0]);
+              
+              if (isLegacy) {
+                 slide.addText("CALCULATION TABLE", { x: 5.1, y: 1.1, w: 4.5, h: 0.2, fontSize: 9, color: textHeading, bold: true });
+                 let tableData: any[] = [
+                   [{ text: "Metric", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }, 
+                    { text: "Before", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }, 
+                    { text: "After", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }, 
+                    { text: "Gain", options: { bold: true, color: "FFFFFF", fill: "6366F1" } }]
+                 ];
+                 parsedTable.forEach((row: any) => tableData.push([
+                   {text: String(row.metric || ""), options: {color: textBody}}, 
+                   {text: String(row.before || ""), options: {color: textBody}}, 
+                   {text: String(row.after || ""), options: {color: textBody}}, 
+                   {text: String(row.gain || ""), options: {color: textBody}}
+                 ]));
+                 slide.addTable(tableData, { 
+                   x: 5.1, y: 1.3, w: 4.5, 
+                   border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
+                   fill: { color: cardBg }, 
+                   fontSize: 9, 
+                   colW: [1.8, 0.9, 0.9, 0.9],
+                   autoPage: true, autoPageRepeatHeader: true, autoPageSlideStartY: 1.3
+                 });
+              } else {
+                 const numCols = Math.max(...parsedTable.map((r: any[]) => r?.length || 0));
+                 const maxColsPerSlide = 8;
+                 const numChunks = Math.ceil(numCols / maxColsPerSlide);
+                 const isLarge = numCols > 4;
+
+                 if (!isLarge) {
+                     slide.addText("CALCULATION TABLE", { x: 5.1, y: 1.1, w: 4.5, h: 0.2, fontSize: 9, color: textHeading, bold: true });
+                 }
+
+                 for (let chunk = 0; chunk < numChunks; chunk++) {
+                     const startCol = chunk * maxColsPerSlide;
+                     const endCol = Math.min(startCol + maxColsPerSlide, numCols);
+                     const chunkCols = endCol - startCol;
+                     
+                     let targetSlide = slide;
+                     let targetX = 5.1;
+                     let targetY = 1.3;
+                     let targetW = 4.5;
+                     
+                     if (isLarge || chunk > 0) {
+                         // Create a new full-width slide for this chunk
+                         targetSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+                         targetX = 0.5;
+                         targetY = 1.0;
+                         targetW = 9.0;
+                         
+                         targetSlide.addText([
+                           { text: `CALCULATION TABLE (Part ${chunk + 1}): `, options: { color: textHeading, bold: true } },
+                           { text: sub.title, options: { color: textBody, bold: false } }
+                         ], { x: 0.5, y: 0.4, w: 9, h: 0.3, fontSize: 18 });
+                     }
+
+                     let tableData: any[] = [];
+                     parsedTable.forEach((row: any[], rIdx: number) => {
+                         const isHeader = rIdx === 0;
+                         const paddedRow = Array.isArray(row) ? [...row] : [];
+                         while(paddedRow.length < numCols) paddedRow.push("");
+                         
+                         const chunkRow = paddedRow.slice(startCol, endCol);
+                         tableData.push(chunkRow.map((cell: string) => ({
+                           text: String(cell || ""),
+                           options: {
+                             color: isHeader ? "FFFFFF" : textBody,
+                             fill: isHeader ? "6366F1" : cardBg,
+                             bold: isHeader
+                           }
+                         })));
+                     });
+
+                     let fontSize = chunkCols > 6 ? 7 : (chunkCols > 4 ? 8 : 10);
+                     if (!isLarge) fontSize = chunkCols > 4 ? 7 : 9;
+
+                     targetSlide.addTable(tableData, { 
+                       x: targetX, y: targetY, w: targetW, 
+                       border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
+                       fill: { color: cardBg }, 
+                       fontSize: fontSize, 
+                       colW: Array(chunkCols).fill(targetW / chunkCols),
+                       autoPage: true,
+                       autoPageRepeatHeader: true,
+                       autoPageSlideStartY: targetY
+                     });
+                 }
+              }
+            }
           } catch(e) {}
         }
 
@@ -303,19 +361,38 @@ export async function POST(req: Request) {
           slide.addText("ACTION TAKEN TABLE", { x: 4.8, y: 1.1, w: 4.8, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
           try {
               const parsedActions = JSON.parse(sub.actionTakenTable);
-              let actionTable: any[] = [
-                [{ text: "Action Taken / Planned", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
-                 { text: "Status", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } }]
-              ];
-              parsedActions.forEach((sugg: any) => actionTable.push([{text: sugg.action, options: {color: textBody}}, {text: sugg.status, options: {color: textBody}}]));
-              
-              slide.addTable(actionTable, { 
-                x: 4.8, y: 1.3, w: 4.8, 
-                border: { type: 'solid', color: cardLine, pt: 0.5 },
-                fill: { color: cardBg }, 
-                fontSize: 8, 
-                colW: [3.8, 1.0]
-              });
+              if (parsedActions && parsedActions.length > 0) {
+                const isLegacy = !Array.isArray(parsedActions[0]);
+                let actionTable: any[] = [];
+                let colCount = 3;
+
+                if (isLegacy) {
+                  actionTable = [
+                    [{ text: "Action Taken / Planned", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
+                     { text: "Target", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
+                     { text: "Status", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } }]
+                  ];
+                  parsedActions.forEach((sugg: any) => actionTable.push([
+                    {text: String(sugg.action || ""), options: {color: textBody}},
+                    {text: String(sugg.target || ""), options: {color: textBody}},
+                    {text: String(sugg.status || ""), options: {color: textBody}}
+                  ]));
+                } else {
+                  colCount = parsedActions[0].length || 1;
+                  actionTable.push(parsedActions[0].map((h: string) => ({ text: String(h || ""), options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } })));
+                  parsedActions.slice(1).forEach((row: string[]) => {
+                    actionTable.push(row.map((c: string) => ({ text: String(c || ""), options: { color: textBody } })));
+                  });
+                }
+
+                slide.addTable(actionTable, {
+                  x: 4.8, y: 1.3, w: 4.8,
+                  border: { type: 'solid', color: cardLine, pt: 0.5 },
+                  fill: { color: cardBg },
+                  fontSize: 8,
+                  colW: Array(colCount).fill(4.8 / colCount)
+                });
+              }
           } catch (e) {}
         }
 
@@ -331,9 +408,9 @@ export async function POST(req: Request) {
                { text: "Calculation", options: { bold: true, color: "111111", fill: accentPrimary } }]
             ];
             parsedImpact.forEach((row: any) => tableData.push([
-              { text: row.parameter, options: { color: "FFFFFF" } },
-              { text: row.value, options: { color: "E53E3E", bold: true } },
-              { text: row.calculation || row.calculate, options: { color: "FFFFFF" } }
+              { text: String(row.parameter || ""), options: { color: "FFFFFF" } },
+              { text: String(row.value || ""), options: { color: "E53E3E", bold: true } },
+              { text: String(row.calculation || row.calculate || ""), options: { color: "FFFFFF" } }
             ]));
             
             slide.addTable(tableData, { 
@@ -367,28 +444,57 @@ export async function POST(req: Request) {
           slide.addText("CUSTOM TABLE", { x: 0.4, y: 1.1, w: 9, h: 0.2, fontSize: 9, color: textHeading, bold: true });
           try {
             const parsedTable = JSON.parse(sub.customTable);
-            if (parsedTable.length > 0) {
-              const numCols = parsedTable[0].length;
-              const colW = Array(numCols).fill(9.2 / numCols);
-              let tableData: any[] = [];
-              parsedTable.forEach((row: string[], rIdx: number) => {
-                const isHeader = rIdx === 0;
-                tableData.push(row.map((cell: string) => ({
-                  text: cell,
-                  options: {
-                    color: isHeader ? "FFFFFF" : textBody,
-                    fill: isHeader ? accentPrimary : cardBg,
-                    bold: isHeader
+            if (Array.isArray(parsedTable) && parsedTable.length > 0) {
+              const numCols = Math.max(...parsedTable.map((r: any[]) => r?.length || 0));
+              const maxColsPerSlide = 8;
+              const numChunks = Math.ceil(numCols / maxColsPerSlide);
+
+              for (let chunk = 0; chunk < numChunks; chunk++) {
+                  const startCol = chunk * maxColsPerSlide;
+                  const endCol = Math.min(startCol + maxColsPerSlide, numCols);
+                  const chunkCols = endCol - startCol;
+                  
+                  let targetSlide = slide;
+                  if (chunk > 0) {
+                      targetSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+                      targetSlide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.3, fill: { color: accentPrimary } });
+                      targetSlide.addText([
+                        { text: `SUPPORTING (Part ${chunk + 1}): `, options: { color: textHeading, bold: true } },
+                        { text: sub.title, options: { color: textBody, bold: false } }
+                      ], { x: headerX + 0.1, y: 0.6, w: 9, h: 0.3, fontSize: 18 });
                   }
-                })));
-              });
-              slide.addTable(tableData, { 
-                x: 0.4, y: 1.3, w: 9.2, 
-                border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
-                fill: { color: cardBg }, 
-                fontSize: 9, 
-                colW: colW
-              });
+                  
+                  targetSlide.addText(`CUSTOM TABLE${numChunks > 1 ? ` (Part ${chunk + 1})` : ''}`, { x: 0.4, y: 1.1, w: 9, h: 0.2, fontSize: 9, color: textHeading, bold: true });
+
+                  const colW = Array(chunkCols).fill(9.2 / chunkCols);
+                  let tableData: any[] = [];
+                  parsedTable.forEach((row: any[], rIdx: number) => {
+                    const isHeader = rIdx === 0;
+                    const paddedRow = Array.isArray(row) ? [...row] : [];
+                    while(paddedRow.length < numCols) paddedRow.push("");
+                    
+                    const chunkRow = paddedRow.slice(startCol, endCol);
+                    tableData.push(chunkRow.map((cell: string) => ({
+                      text: String(cell || ""),
+                      options: {
+                        color: isHeader ? "FFFFFF" : textBody,
+                        fill: isHeader ? accentPrimary : cardBg,
+                        bold: isHeader
+                      }
+                    })));
+                  });
+                  
+                  targetSlide.addTable(tableData, { 
+                    x: 0.4, y: 1.3, w: 9.2, 
+                    border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
+                    fill: { color: cardBg }, 
+                    fontSize: chunkCols > 6 ? 7 : (chunkCols > 4 ? 8 : 10), 
+                    colW: colW,
+                    autoPage: true,
+                    autoPageRepeatHeader: true,
+                    autoPageSlideStartY: 1.3
+                  });
+              }
             }
           } catch(e) {}
         }
@@ -405,7 +511,6 @@ export async function POST(req: Request) {
           });
         }
       }
-      addSmallQr(slide);
     });
 
     // FEEDBACK GALLERY SLIDE
@@ -426,7 +531,6 @@ export async function POST(req: Request) {
         fbSlide.addText(`— ${s.guestName || "Anonymous"} (${s.guestDept || "General"} Dept)`, { x: 0.6, y: startY + 0.45, w: 8.8, h: 0.2, fontSize: 10, bold: true, color: textHeading });
         startY += 1.0;
       });
-      addSmallQr(fbSlide);
     }
 
     // ----------------------------------------------------

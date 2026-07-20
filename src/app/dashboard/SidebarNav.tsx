@@ -63,11 +63,6 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
             Workshop Mode
           </Link>
           
-          <Link href="/dashboard/teams" className={getClassName("/dashboard/teams")}>
-            <Users size={18} />
-            Teams
-          </Link>
-
           <Link href="/dashboard/settings" className={getClassName("/dashboard/settings")}>
             <Settings size={18} />
             Settings

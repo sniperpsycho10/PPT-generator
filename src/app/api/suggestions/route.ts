@@ -9,17 +9,20 @@ export async function POST(req: Request) {
     let guestName = "Anonymous";
     let guestDept = "General";
     let suggestionText = "";
+    let submissionId = null;
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
       guestName = formData.get("guestName")?.toString() || "Anonymous";
       guestDept = formData.get("guestDept")?.toString() || "General";
       suggestionText = formData.get("suggestionText")?.toString() || "";
+      submissionId = formData.get("submissionId")?.toString() || null;
     } else {
       const body = await req.json();
       guestName = body.guestName || "Anonymous";
       guestDept = body.guestDept || "General";
       suggestionText = body.suggestionText;
+      submissionId = body.submissionId || null;
     }
 
     if (!suggestionText) {
@@ -36,7 +39,8 @@ export async function POST(req: Request) {
         guestName,
         guestDept,
         suggestionText,
-        status: "Pending"
+        status: "Pending",
+        submissionId
       }
     });
 
@@ -82,7 +86,16 @@ export async function GET() {
     const suggestions = await prisma.suggestion.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
-      include: { submission: true }
+      include: { 
+        submission: true, 
+        assignedTeam: {
+          include: {
+            members: {
+              select: { name: true, email: true }
+            }
+          }
+        } 
+      }
     });
     return NextResponse.json({ success: true, data: suggestions });
   } catch (error) {

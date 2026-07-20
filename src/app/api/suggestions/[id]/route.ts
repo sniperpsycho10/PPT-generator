@@ -7,12 +7,36 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
   try {
     const params = await props.params;
     const id = params.id;
-    const { status } = await req.json();
+    const { status, assignedTeamId, guestName, guestDept, suggestionText } = await req.json();
+
+    const dataToUpdate: any = {};
+    if (status !== undefined) dataToUpdate.status = status;
+    if (assignedTeamId !== undefined) dataToUpdate.assignedTeamId = assignedTeamId;
+    if (guestName !== undefined) dataToUpdate.guestName = guestName;
+    if (guestDept !== undefined) dataToUpdate.guestDept = guestDept;
+    if (suggestionText !== undefined) dataToUpdate.suggestionText = suggestionText;
 
     const updated = await prisma.suggestion.update({
       where: { id },
-      data: { status }
+      data: dataToUpdate
     });
+
+    if (assignedTeamId) {
+      const team = await prisma.team.findUnique({
+        where: { id: assignedTeamId },
+        include: { members: true }
+      });
+      if (team && team.members.length > 0) {
+        await prisma.notification.createMany({
+          data: team.members.map((m) => ({
+            userId: m.id,
+            title: "New Assignment",
+            message: `Your team (${team.name}) has been assigned a new suggestion: ${updated.suggestionText || 'View details'}`,
+            link: "/dashboard/tracking"
+          }))
+        });
+      }
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
