@@ -27,14 +27,50 @@ export default function WorkshopMode() {
     fetch('/api/submissions')
       .then(r => r.json())
       .then(res => {
-        if (res.data) setSubmissions(res.data.filter((s: any) => s.status === 'Accepted'));
+        if (res.data) {
+          const accepted = res.data.filter((s: any) => s.status === 'Accepted');
+          const bps = accepted.filter((s: any) => s.type === "BestPractice");
+          const rps = accepted.filter((s: any) => s.type === "RepetitiveProblem");
+          const ss = accepted.filter((s: any) => s.type === "SupportingSlide");
+          
+          const ordered: any[] = [];
+          const getSupporting = (t: string) => ss.find((s: any) => s.title === `Supporting Doc: ${t}`);
+          
+          bps.forEach((bp: any) => {
+            ordered.push(bp);
+            const child = getSupporting(bp.title);
+            if (child) ordered.push(child);
+          });
+          
+          rps.forEach((rp: any) => {
+            ordered.push(rp);
+            const child = getSupporting(rp.title);
+            if (child) ordered.push(child);
+            
+            const acceptedSuggestions = (rp.suggestions || []).filter((s: any) => s.status === 'Accepted');
+            if (acceptedSuggestions.length > 0) {
+              ordered.push({
+                type: "SuggestionList",
+                forTitle: rp.title,
+                suggestions: acceptedSuggestions
+              });
+            }
+          });
+          
+          const usedIds = new Set(ordered.map((s: any) => s.id));
+          accepted.forEach((s: any) => {
+            if (!usedIds.has(s.id)) ordered.push(s);
+          });
+          
+          setSubmissions(ordered);
+        }
       })
       .catch(console.error);
 
     fetch('/api/suggestions')
       .then(r => r.json())
       .then(res => {
-        if (res.data) setSuggestions(res.data.filter((s: any) => s.status === 'Accepted'));
+        if (res.data) setSuggestions(res.data.filter((s: any) => s.status === 'Accepted' && !s.submissionId));
       })
       .catch(console.error);
   }, []);
@@ -202,7 +238,7 @@ export default function WorkshopMode() {
     const t = styles[templateStyle as keyof typeof styles] || styles.corporate;
 
     const renderWrapper = (children: React.ReactNode) => (
-      <div style={{ position: 'relative', width: '100%', height: '100%', background: t.bg, padding: '4rem 3rem 2rem 3rem', color: t.text }}>
+      <div style={{ position: 'relative', width: '100%', height: '100%', background: t.bg, padding: '4rem 3rem 2rem 3rem', color: t.text, fontFamily: "'Poppins', sans-serif" }}>
         {t.headerBar}
         <img src="/background.jpg" alt="JSPL Logo" style={t.logoStyle} />
         <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundImage: 'url(/background.jpg)', backgroundSize: 'cover', opacity: templateStyle === 'dark' ? 0.05 : 0.15, zIndex: 0 }} />
@@ -252,6 +288,27 @@ export default function WorkshopMode() {
         )}
       </div>
     );
+    if (currentSlide.type === "SuggestionList") {
+      return renderWrapper(
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '3rem' }}>
+            <div style={{ width: '8px', height: '32px', backgroundColor: t.accent }}></div>
+            <h1 style={{ color: t.heading, fontSize: '2.5rem', margin: 0, paddingLeft: templateStyle === 'modern' ? '6rem' : '0' }}>Suggestions for: {currentSlide.forTitle}</h1>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+            {currentSlide.suggestions.map((s: any) => (
+              <div key={s.id} style={{ flex: '1 1 calc(33% - 1.5rem)', backgroundColor: t.cardBg, borderRadius: '8px', borderLeft: `4px solid ${t.accent}`, padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                <p style={{ fontSize: '1.1rem', marginBottom: '1rem', fontStyle: 'italic', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>"{s.suggestionText}"</p>
+                <div style={{ fontWeight: 'bold', color: t.heading }}>— {s.guestName || 'Anonymous'}</div>
+                <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{s.guestDept || 'General'} Dept</div>
+              </div>
+            ))}
+          </div>
+        </>
+      );
+    }
+
 
     if (currentSlide.type === "FeedbackGallery") {
       return renderWrapper(
@@ -357,20 +414,20 @@ export default function WorkshopMode() {
         {/* Content Body */}
         <div style={{ display: 'flex', gap: '2rem', flex: 1, minHeight: 0 }}>
           {/* LEFT COLUMN */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
             {currentSlide.type === "BestPractice" ? (
               <>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>OBJECTIVE / PURPOSE</div>
-                  <div style={{ fontSize: '0.9rem' }}>{currentSlide.objective || 'N/A'}</div>
+                  <div style={{ fontSize: '0.9rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{currentSlide.objective || 'N/A'}</div>
                 </div>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>PROBLEM ADDRESSED</div>
-                  <div style={{ fontSize: '0.9rem' }}>{currentSlide.problemAddressed || 'N/A'}</div>
+                  <div style={{ fontSize: '0.9rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{currentSlide.problemAddressed || 'N/A'}</div>
                 </div>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1.5 }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>METHODOLOGY / INNOVATION</div>
-                  <div style={{ fontSize: '0.9rem' }}>{currentSlide.methodology || 'N/A'}</div>
+                  <div style={{ fontSize: '0.9rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{currentSlide.methodology || 'N/A'}</div>
                 </div>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>IMPACT / SAVING</div>
@@ -382,7 +439,7 @@ export default function WorkshopMode() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1 }}>
                     <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>PROBLEM STATEMENT</div>
-                    <div style={{ fontSize: '0.9rem' }}>{currentSlide.problemStatement || 'N/A'}</div>
+                    <div style={{ fontSize: '0.9rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{currentSlide.problemStatement || 'N/A'}</div>
                   </div>
                   
                   <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1.5, overflowY: 'auto' }}>
@@ -433,7 +490,7 @@ export default function WorkshopMode() {
           </div>
 
           {/* RIGHT COLUMN */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
             {currentSlide.type === "BestPractice" ? (
               <>
                 {currentSlide.calculationTable && (
@@ -520,34 +577,62 @@ export default function WorkshopMode() {
               <>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>ACTION TAKEN TABLE</div>
-                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#4A90E2', color: 'white' }}>
-                        <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Action Taken / Planned</th>
-                        <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Target</th>
-                        <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        try {
-                          const table = JSON.parse(currentSlide.actionTakenTable || "[]");
-                          return table.map((r: any, i: number) => (
-                            <tr key={i}>
-                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.action || '')}</td>
-                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.target || '')}</td>
-                              <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.status || '')}</td>
-                            </tr>
-                          ));
-                        } catch(e) { return null; }
-                      })()}
-                    </tbody>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '35vh' }}>
+                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', backgroundColor: t.cardBg, minWidth: 'max-content' }}>
+                    {(() => {
+                      try {
+                        const table = JSON.parse(currentSlide.actionTakenTable || "[]");
+                        if (!table || table.length === 0) return null;
+                        const isLegacy = !Array.isArray(table[0]);
+                        if (isLegacy) {
+                          return (
+                            <>
+                              <thead>
+                                <tr style={{ backgroundColor: '#4A90E2', color: 'white' }}>
+                                  <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Action Taken / Planned</th>
+                                  <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Target</th>
+                                  <th style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {table.map((r: any, i: number) => (
+                                  <tr key={i}>
+                                    <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.action || '')}</td>
+                                    <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.target || '')}</td>
+                                    <td style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{String(r.status || '')}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </>
+                          );
+                        } else {
+                          return (
+                            <>
+                              <thead>
+                                <tr style={{ backgroundColor: '#4A90E2', color: 'white' }}>
+                                  {table[0].map((h: string, i: number) => <th key={i} style={{ padding: '2px 4px', border: '1px solid #CCCCCC', textAlign: 'left' }}>{h}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {table.slice(1).map((r: string[], i: number) => (
+                                  <tr key={i}>
+                                    {r.map((c: string, j: number) => <td key={j} style={{ padding: '2px 4px', border: '1px solid #CCCCCC' }}>{c}</td>)}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </>
+                          );
+                        }
+                      } catch(e) { return null; }
+                    })()}
                   </table>
+                  </div>
                 </div>
 
                 <div style={{ backgroundColor: templateStyle === 'dark' ? '#111' : '#EAF4F4', border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>IMPACT CALCULATION</div>
-                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '35vh' }}>
+                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', minWidth: 'max-content' }}>
                     {(() => {
                       try {
                         const table = JSON.parse(currentSlide.impactCalculation || "[]");
@@ -595,6 +680,7 @@ export default function WorkshopMode() {
                       } catch(e) { return null; }
                     })()}
                   </table>
+                  </div>
                 </div>
 
                 {currentSlide.attachmentUrl && (

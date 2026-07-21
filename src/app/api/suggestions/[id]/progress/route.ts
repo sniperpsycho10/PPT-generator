@@ -42,7 +42,9 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
         suggestionId: id,
         progress: progressValue,
         notes: data.notes || null,
-        photoUrls: data.photoUrls || []
+        photoUrls: data.photoUrls || [],
+        attachedFileUrl: data.attachedFileUrl || null,
+        attachedFileName: data.attachedFileName || null
       }
     });
 

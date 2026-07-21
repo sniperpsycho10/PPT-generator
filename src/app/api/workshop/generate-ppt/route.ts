@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     
     let pptx = new PptxGenJS();
     pptx.layout = "LAYOUT_16x9";
+    pptx.theme = { headFontFace: "Poppins", bodyFontFace: "Poppins" };
     pptx.author = "JSPL System";
     pptx.company = "Jindal Steel & Power";
     pptx.title = "Monthly Maintenance Workshop";
@@ -106,10 +107,35 @@ export async function POST(req: Request) {
     }
 
     // FETCH REAL DATA
-    const dbSubmissions = await prisma.submission.findMany({
+    let dbSubmissions = await prisma.submission.findMany({
       where: { status: "Accepted" },
       include: { department: true, suggestions: true }
     });
+
+    const bps = dbSubmissions.filter(s => s.type === "BestPractice");
+    const rps = dbSubmissions.filter(s => s.type === "RepetitiveProblem");
+    const ss = dbSubmissions.filter(s => s.type === "SupportingSlide");
+    
+    const ordered: any[] = [];
+    const getSupporting = (t: string) => ss.find(s => s.title === `Supporting Doc: ${t}`);
+    
+    bps.forEach(bp => {
+      ordered.push(bp);
+      const child = getSupporting(bp.title);
+      if (child) ordered.push(child);
+    });
+    
+    rps.forEach(rp => {
+      ordered.push(rp);
+      const child = getSupporting(rp.title);
+      if (child) ordered.push(child);
+    });
+    
+    const usedIds = new Set(ordered.map(s => s.id));
+    dbSubmissions.forEach(s => {
+      if (!usedIds.has(s.id)) ordered.push(s);
+    });
+    dbSubmissions = ordered;
 
     // Calculate total slides to link the QR code to the final slide
     
@@ -180,7 +206,7 @@ export async function POST(req: Request) {
         
         const innerCardStyle = { w: 4.5, fill: { color: cardBg }, line: { color: accentPrimary, width: 0.5 } };
         const labelStyle = { w: 4.3, h: 0.2, fontSize: 9, bold: true, color: accentPrimary };
-        const textStyle = { w: 4.3, fontSize: 10, color: textBody };
+        const textStyle: any = { w: 4.3, fontSize: 10, color: textBody, valign: 'top', wrap: true };
 
         slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 1.1, h: 0.8, ...innerCardStyle });
         slide.addText("OBJECTIVE / PURPOSE", { x: 0.5, y: 1.15, ...labelStyle });
@@ -334,103 +360,141 @@ export async function POST(req: Request) {
           { text: sub.title, options: { color: textBody, bold: false } }
         ], { x: headerX + 0.1, y: 0.6, w: 9, h: 0.3, fontSize: 18 });
         
-        const innerCardStyle = { w: 4.2, fill: { color: cardBg }, line: { color: accentPrimary, width: 0.5 } };
-        const labelStyle = { w: 4.0, h: 0.2, fontSize: 9, bold: true, color: accentPrimary };
-        const textStyle = { w: 4.0, fontSize: 10, color: textBody };
+        // --- Left Column: Problem Statement & Why-Why Analysis ---
+        const leftX = 0.4;
+        const leftW = 4.2;
+        
+        // Problem Statement
+        slide.addShape(pptx.ShapeType.rect, { x: leftX, y: 1.1, h: 0.8, w: leftW, fill: { color: cardBg }, line: { color: accentPrimary, width: 0.5 } });
+        slide.addText("PROBLEM STATEMENT", { x: leftX + 0.1, y: 1.15, w: leftW - 0.2, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
+        slide.addText(sub.problemStatement || "N/A", { x: leftX + 0.1, y: 1.4, w: leftW - 0.2, h: 0.4, fontSize: 10, color: textBody, valign: 'top', wrap: true });
 
-        slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 1.1, h: 0.8, ...innerCardStyle });
-        slide.addText("PROBLEM STATEMENT", { x: 0.5, y: 1.15, ...labelStyle });
-        slide.addText(sub.problemStatement || "N/A", { x: 0.5, y: 1.4, h: 0.4, ...textStyle });
+        // Why-Why Analysis - dynamically sized
+        let whyCount = 0;
+        let whys: string[] = [];
+        try { whys = JSON.parse(sub.whyWhyAnalysis || "[]"); whyCount = whys.filter((w: string) => w).length; } catch(e) {}
+        const whyBoxH = Math.max(0.8, 0.3 + whyCount * 0.3);
+        
+        slide.addShape(pptx.ShapeType.rect, { x: leftX, y: 2.0, h: whyBoxH, w: leftW, fill: { color: cardBg }, line: { color: accentPrimary, width: 0.5 } });
+        slide.addText("WHY-WHY ANALYSIS", { x: leftX + 0.1, y: 2.05, w: leftW - 0.2, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
+        let yPos = 2.3;
+        whys.forEach((why: string, i: number) => {
+          if (why) {
+            slide.addText(`Why ${i+1}: ${why}`, { x: leftX + 0.1, y: yPos, w: leftW - 0.2, h: 0.2, fontSize: 9, color: textBody, bold: false });
+            yPos += 0.3;
+          }
+        });
 
-        slide.addShape(pptx.ShapeType.rect, { x: 0.4, y: 2.0, h: 2.7, ...innerCardStyle });
-        slide.addText("WHY-WHY ANALYSIS", { x: 0.5, y: 2.05, ...labelStyle });
-        if (sub.whyWhyAnalysis) {
-          try {
-            const whys = JSON.parse(sub.whyWhyAnalysis);
-            let yPos = 2.3;
-            whys.forEach((why: string, i: number) => {
-              if (why) {
-                slide.addText(`Why ${i+1}: ${why}`, { x: 0.5, y: yPos, w: 4.0, h: 0.2, fontSize: 9, color: textBody, bold: false });
-                yPos += 0.3;
+        // --- Right Column: Action Taken & Impact Calculation ---
+        const rightX = 4.8;
+        const rightW = 4.8;
+        const maxColsInline = 4;
+
+        // Helper to add a table, potentially on its own full-width slide if too wide
+        const addDynamicTable = (parsed: any[], tableTitle: string, headerFill: string, headerColor: string, bodyColor: string, inlineY: number, inlineH: number) => {
+          if (!parsed || parsed.length === 0) return;
+          const isLegacy = !Array.isArray(parsed[0]);
+          let allRows: any[][] = [];
+          let colCount = 3;
+
+          if (isLegacy) {
+            // Legacy format - keep as-is (always 3 cols, fits inline)
+            const headers = tableTitle.includes("ACTION") 
+              ? ["Action Taken / Planned", "Target", "Status"]
+              : ["Parameter", "Value", "Calculation"];
+            allRows.push(headers.map(h => ({ text: h, options: { bold: true, color: headerColor, fill: { color: headerFill } } })));
+            parsed.forEach((row: any) => {
+              if (tableTitle.includes("ACTION")) {
+                allRows.push([
+                  { text: String(row.action || ""), options: { color: bodyColor } },
+                  { text: String(row.target || ""), options: { color: bodyColor } },
+                  { text: String(row.status || ""), options: { color: bodyColor } }
+                ]);
+              } else {
+                allRows.push([
+                  { text: String(row.parameter || ""), options: { color: bodyColor } },
+                  { text: String(row.value || ""), options: { color: "E53E3E", bold: true } },
+                  { text: String(row.calculation || row.calculate || ""), options: { color: bodyColor } }
+                ]);
               }
             });
+          } else {
+            colCount = parsed[0].length || 1;
+            allRows.push(parsed[0].map((h: string) => ({ text: String(h || ""), options: { bold: true, color: headerColor, fill: { color: headerFill } } })));
+            parsed.slice(1).forEach((row: string[]) => {
+              allRows.push(row.map((c: string) => ({ text: String(c || ""), options: { color: bodyColor } })));
+            });
+          }
+
+          if (colCount <= maxColsInline) {
+            // Fits in the right column of the main slide
+            slide.addText(tableTitle, { x: rightX, y: inlineY, w: rightW, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
+            slide.addTable(allRows, {
+              x: rightX, y: inlineY + 0.2, w: rightW,
+              border: { type: 'solid', color: cardLine, pt: 0.5 },
+              fill: { color: cardBg },
+              fontSize: 8,
+              colW: Array(colCount).fill(rightW / colCount),
+              autoPage: true, autoPageRepeatHeader: true, autoPageSlideStartY: 1.0
+            });
+          } else {
+            // Wide table - put on its own full-width slide(s) with column chunking
+            const maxColsPerSlide = 8;
+            const numChunks = Math.ceil(colCount / maxColsPerSlide);
+            for (let chunk = 0; chunk < numChunks; chunk++) {
+              const startCol = chunk * maxColsPerSlide;
+              const endCol = Math.min(startCol + maxColsPerSlide, colCount);
+              const chunkCols = endCol - startCol;
+              
+              const targetSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+              const partLabel = numChunks > 1 ? ` (Part ${chunk + 1})` : "";
+              targetSlide.addText([
+                { text: `${tableTitle}${partLabel}: `, options: { color: textHeading, bold: true } },
+                { text: sub.title, options: { color: textBody, bold: false } }
+              ], { x: 0.5, y: 0.4, w: 9, h: 0.3, fontSize: 18 });
+
+              const chunkData = allRows.map((row, rIdx) => {
+                return row.slice(startCol, endCol);
+              });
+
+              const fontSize = chunkCols > 6 ? 7 : (chunkCols > 4 ? 8 : 9);
+              targetSlide.addTable(chunkData, {
+                x: 0.5, y: 1.0, w: 9.0,
+                border: { type: 'solid', color: cardLine, pt: 0.5 },
+                fill: { color: cardBg },
+                fontSize: fontSize,
+                colW: Array(chunkCols).fill(9.0 / chunkCols),
+                autoPage: true, autoPageRepeatHeader: true, autoPageSlideStartY: 1.0
+              });
+            }
+          }
+        };
+
+        // Action Taken Table
+        if (sub.actionTakenTable) {
+          try {
+            const parsedActions = JSON.parse(sub.actionTakenTable);
+            addDynamicTable(parsedActions, "ACTION TAKEN TABLE", accentTertiary, "FFFFFF", textBody, 1.1, 1.2);
           } catch(e) {}
         }
 
-        if (sub.actionTakenTable) {
-          slide.addText("ACTION TAKEN TABLE", { x: 4.8, y: 1.1, w: 4.8, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
-          try {
-              const parsedActions = JSON.parse(sub.actionTakenTable);
-              if (parsedActions && parsedActions.length > 0) {
-                const isLegacy = !Array.isArray(parsedActions[0]);
-                let actionTable: any[] = [];
-                let colCount = 3;
-
-                if (isLegacy) {
-                  actionTable = [
-                    [{ text: "Action Taken / Planned", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
-                     { text: "Target", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } },
-                     { text: "Status", options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } }]
-                  ];
-                  parsedActions.forEach((sugg: any) => actionTable.push([
-                    {text: String(sugg.action || ""), options: {color: textBody}},
-                    {text: String(sugg.target || ""), options: {color: textBody}},
-                    {text: String(sugg.status || ""), options: {color: textBody}}
-                  ]));
-                } else {
-                  colCount = parsedActions[0].length || 1;
-                  actionTable.push(parsedActions[0].map((h: string) => ({ text: String(h || ""), options: { bold: true, color: "FFFFFF", fill: { color: accentTertiary } } })));
-                  parsedActions.slice(1).forEach((row: string[]) => {
-                    actionTable.push(row.map((c: string) => ({ text: String(c || ""), options: { color: textBody } })));
-                  });
-                }
-
-                slide.addTable(actionTable, {
-                  x: 4.8, y: 1.3, w: 4.8,
-                  border: { type: 'solid', color: cardLine, pt: 0.5 },
-                  fill: { color: cardBg },
-                  fontSize: 8,
-                  colW: Array(colCount).fill(4.8 / colCount)
-                });
-              }
-          } catch (e) {}
-        }
-
-        slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 2.4, h: 0.8, w: 4.8, fill: { color: "111111" }, line: { color: accentPrimary, width: 1 } });
-        slide.addText("IMPACT CALCULATION", { x: 4.9, y: 2.45, w: 4.6, h: 0.2, fontSize: 9, bold: true, color: accentPrimary });
-        
+        // Impact Calculation
         if (sub.impactCalculation) {
           try {
             const parsedImpact = JSON.parse(sub.impactCalculation);
-            let tableData: any[] = [
-              [{ text: "Parameter", options: { bold: true, color: "111111", fill: accentPrimary } }, 
-               { text: "Value", options: { bold: true, color: "111111", fill: accentPrimary } }, 
-               { text: "Calculation", options: { bold: true, color: "111111", fill: accentPrimary } }]
-            ];
-            parsedImpact.forEach((row: any) => tableData.push([
-              { text: String(row.parameter || ""), options: { color: "FFFFFF" } },
-              { text: String(row.value || ""), options: { color: "E53E3E", bold: true } },
-              { text: String(row.calculation || row.calculate || ""), options: { color: "FFFFFF" } }
-            ]));
-            
-            slide.addTable(tableData, { 
-              x: 4.9, y: 2.7, w: 4.6, 
-              border: { type: 'solid', color: accentPrimary, pt: 0.5 },
-              fill: { color: "111111" }, 
-              fontSize: 8, 
-              colW: [1.5, 1.5, 1.6]
-            });
+            addDynamicTable(parsedImpact, "IMPACT CALCULATION", accentPrimary, "111111", "FFFFFF", 2.5, 1.2);
           } catch(e) {}
         }
 
+        // Supporting Evidence Image
         if (sub.attachmentUrl) {
-          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.4, w: 4.8, h: 1.3, fill: { color: "111111" }, line: { color: accentSecondary, width: 1.5 } });
+          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.8, w: 4.8, h: 1.0, fill: { color: "111111" }, line: { color: accentSecondary, width: 1.5 } });
           const attachImgPath = path.join(process.cwd(), "public", sub.attachmentUrl);
           if (fs.existsSync(attachImgPath)) {
-              slide.addImage({ path: attachImgPath, x: 4.8, y: 3.4, w: 4.8, h: 1.3 });
+              slide.addImage({ path: attachImgPath, x: 4.8, y: 3.8, w: 4.8, h: 1.0 });
           }
-          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.4, w: 1.5, h: 0.15, fill: { color: "666666" } });
-          slide.addText("SUPPORTING EVIDENCE", { x: 4.8, y: 3.4, w: 1.5, h: 0.15, fontSize: 7, color: "FFFFFF", bold: true, align: "center" });
+          slide.addShape(pptx.ShapeType.rect, { x: 4.8, y: 3.8, w: 1.5, h: 0.15, fill: { color: "666666" } });
+          slide.addText("SUPPORTING EVIDENCE", { x: 4.8, y: 3.8, w: 1.5, h: 0.15, fontSize: 7, color: "FFFFFF", bold: true, align: "center" });
         }
       } else {
         // Supporting Slide
@@ -511,10 +575,32 @@ export async function POST(req: Request) {
           });
         }
       }
+
+      // Add suggestions slide if this submission has accepted suggestions
+      if (sub.type !== "SupportingSlide") {
+        const acceptedSuggestions = (sub.suggestions || []).filter((s: any) => s.status === 'Accepted');
+        if (acceptedSuggestions.length > 0) {
+          const sugSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+          if (templateStyle === 'corporate') {
+            sugSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.5, h: 5.625, fill: { color: "2C3E50" } });
+          }
+          const headerX = templateStyle === 'modern' ? 1.5 : 0.4;
+          sugSlide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.4, fill: { color: accentPrimary } });
+          sugSlide.addText(`SUGGESTIONS FOR: ${sub.title.toUpperCase()}`, { x: headerX + 0.1, y: 0.6, w: 8, h: 0.4, fontSize: 18, bold: true, color: textHeading });
+          
+          let startY = 1.5;
+          acceptedSuggestions.slice(0, 4).forEach((s: any) => {
+            sugSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: startY, w: 9, h: 0.8, fill: { color: cardBg }, line: { color: accentPrimary, width: 2 }, rectRadius: 0.1 });
+            sugSlide.addText(`"${s.suggestionText}"`, { x: 0.6, y: startY + 0.1, w: 8.8, h: 0.4, fontSize: 14, italic: true, color: textBody, valign: 'top', wrap: true } as any);
+            sugSlide.addText(`— ${s.guestName || "Anonymous"} (${s.guestDept || "General"} Dept)`, { x: 0.6, y: startY + 0.45, w: 8.8, h: 0.2, fontSize: 10, bold: true, color: textHeading });
+            startY += 1.0;
+          });
+        }
+      }
     });
 
     // FEEDBACK GALLERY SLIDE
-    const suggestions = await prisma.suggestion.findMany({ where: { status: "Accepted" } });
+    const suggestions = await prisma.suggestion.findMany({ where: { status: "Accepted", submissionId: null } });
     if (suggestions.length > 0) {
       const fbSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
       if (templateStyle === 'corporate') {

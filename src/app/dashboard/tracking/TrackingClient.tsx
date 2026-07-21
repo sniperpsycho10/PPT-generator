@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Edit, X, Calendar, AlertTriangle, IndianRupee, ShieldAlert, GitPullRequestDraft, Upload, Image as ImageIcon, History, Users } from "lucide-react";
+import { Edit, X, Calendar, AlertTriangle, IndianRupee, ShieldAlert, GitPullRequestDraft, Upload, Image as ImageIcon, History, Users, FileText } from "lucide-react";
 
 const STAGES = [
   "Pending Review", 
@@ -61,7 +61,10 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
   const [progressNotes, setProgressNotes] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const [attachedFileUrl, setAttachedFileUrl] = useState<string>("");
+  const [attachedFileName, setAttachedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const [savingProgress, setSavingProgress] = useState(false);
 
   const openModal = (sug: any) => {
@@ -149,6 +152,28 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setUploadingFiles(true);
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) {
+        setAttachedFileUrl(data.url);
+        setAttachedFileName(file.name);
+      } else {
+        alert(`Failed to upload ${file.name}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setUploadingFiles(false);
+    if (docInputRef.current) docInputRef.current.value = "";
+  };
+
   const handleSaveProgress = async () => {
     if (!selectedSug) return;
     if (progressValue < (selectedSug.currentProgress || 0)) {
@@ -163,7 +188,9 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
       body: JSON.stringify({
         progress: progressValue,
         notes: progressNotes,
-        photoUrls: uploadedUrls
+        photoUrls: uploadedUrls,
+        attachedFileUrl,
+        attachedFileName
       })
     });
 
@@ -172,6 +199,8 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
       setSelectedSug(data.data); // Update with new history
       setProgressNotes("");
       setUploadedUrls([]);
+      setAttachedFileUrl("");
+      setAttachedFileName("");
       router.refresh();
       alert("Progress added successfully!");
     } else {
@@ -316,17 +345,7 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
               
               {activeTab === "DETAILS" && (
                 <form onSubmit={handleSaveDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {isAdmin && (
-                    <div style={{ padding: '1rem', background: 'rgba(52, 152, 219, 0.1)', borderRadius: '8px', border: '1px solid rgba(52, 152, 219, 0.2)', marginBottom: '0.5rem' }}>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}><Users size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }}/> Assign to Team</label>
-                      <select className="input-field" value={assignedTeamId} onChange={e => setAssignedTeamId(e.target.value)}>
-                        <option value="">-- Unassigned --</option>
-                        {teams.map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+
 
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: '600' }}>Implementation Stage</label>
@@ -452,6 +471,34 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
                         </div>
                       </div>
 
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--text-primary)' }}>Upload Document (PDF, PPT, Excel, etc.)</label>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <button 
+                            type="button"
+                            onClick={() => docInputRef.current?.click()} 
+                            className="btn" 
+                            style={{ padding: '0.5rem 1rem', background: 'var(--glass-bg)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                            disabled={uploadingFiles}
+                          >
+                            {uploadingFiles ? "Uploading..." : <><FileText size={16} /> Choose File</>}
+                          </button>
+                          <input 
+                            type="file" 
+                            ref={docInputRef} 
+                            style={{ display: 'none' }} 
+                            onChange={handleDocUpload} 
+                          />
+                          {attachedFileName && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--glass-bg)', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid var(--glass-border)', fontSize: '0.85rem' }}>
+                              <FileText size={14} color="var(--jspl-blue)" />
+                              <span style={{ color: 'var(--text-primary)' }}>{attachedFileName}</span>
+                              <button type="button" onClick={() => { setAttachedFileUrl(""); setAttachedFileName(""); }} style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer', padding: '0', marginLeft: '0.5rem' }}><X size={14}/></button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       <div style={{ display: 'flex', gap: '1rem' }}>
                         <button type="button" onClick={() => setSelectedSug(null)} className="btn" style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
                           Close
@@ -500,13 +547,20 @@ export default function TrackingClient({ initialSuggestions, departments = DEPAR
                               )}
                               
                               {log.photoUrls && log.photoUrls.length > 0 && (
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                                   {log.photoUrls.map((url: string, i: number) => (
                                     <a key={i} href={url} target="_blank" rel="noreferrer" style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--glass-border)', display: 'block' }}>
                                       <img src={url} alt={`Evidence ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     </a>
                                   ))}
                                 </div>
+                              )}
+                              
+                              {log.attachedFileUrl && (
+                                <a href={log.attachedFileUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--jspl-blue)', color: 'white', padding: '0.5rem 1rem', borderRadius: '6px', textDecoration: 'none', fontSize: '0.9rem', fontWeight: '500' }}>
+                                  <FileText size={16} />
+                                  {log.attachedFileName || "View Attached Document"}
+                                </a>
                               )}
                             </div>
                           </div>

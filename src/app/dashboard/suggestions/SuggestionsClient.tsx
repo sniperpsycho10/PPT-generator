@@ -6,6 +6,7 @@ import { Plus, X, Edit2 } from "lucide-react";
 export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterProblemId, setFilterProblemId] = useState<string>("ALL");
   
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -29,7 +30,15 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
       const res = await fetch("/api/suggestions");
       const data = await res.json();
       if (data.success) {
-        setSuggestions(data.data);
+        let rawData = data.data;
+        rawData.sort((a: any, b: any) => {
+          const titleA = a.submission?.title || "ZZZ";
+          const titleB = b.submission?.title || "ZZZ";
+          if (titleA < titleB) return -1;
+          if (titleA > titleB) return 1;
+          return 0;
+        });
+        setSuggestions(rawData);
       }
     } catch (err) {
       console.error(err);
@@ -139,7 +148,23 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
               ? "Review audience feedback from the live presentations. Accepted suggestions will automatically appear on the final slide of future presentations!"
               : "Submit your own suggestions and feedback. Once a suggestion is accepted by an administrator, it can no longer be edited."}
           </p>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {isAdmin && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label style={{ fontWeight: 'bold', color: 'var(--text-secondary)' }}>Filter by Problem:</label>
+                <select 
+                  className="input" 
+                  style={{ width: 'auto', minWidth: '200px', padding: '0.4rem', borderRadius: '4px', border: '1px solid #ccc' }} 
+                  value={filterProblemId} 
+                  onChange={e => setFilterProblemId(e.target.value)}
+                >
+                  <option value="ALL">-- All Suggestions --</option>
+                  {Array.from(new Set(suggestions.map(s => s.submission?.title || "General Suggestion"))).sort().map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button className="btn btn-outline" onClick={fetchSuggestions}>Refresh</button>
             {!isAdmin && (
               <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={openAddModal}>
@@ -162,9 +187,9 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center' }}>Loading...</td></tr>}
-              {!loading && suggestions.length === 0 && <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>No suggestions found.</td></tr>}
-              {!loading && suggestions.map(s => (
+              {loading && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center' }}>Loading...</td></tr>}
+              {!loading && suggestions.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>No suggestions found.</td></tr>}
+              {!loading && suggestions.filter(s => filterProblemId === "ALL" || (s.submission?.title || "General Suggestion") === filterProblemId).map(s => (
                 <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '1rem 0' }}>{s.suggestionText}</td>
                   <td>{s.submission?.title || <span style={{ color: '#888', fontStyle: 'italic' }}>General Suggestion</span>}</td>

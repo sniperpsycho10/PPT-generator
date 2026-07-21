@@ -466,19 +466,60 @@ function SubmitPageContent() {
             </div>
 
             <label className="section-label">Impact Calculation</label>
-            {impactCalculation.map((row, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input type="text" className="input-field" placeholder="Parameter (e.g. Tripping Freq)" value={row.parameter} onChange={(e) => { const ni = [...impactCalculation]; ni[idx].parameter = e.target.value; setImpactCalculation(ni); }} />
-                <input type="text" className="input-field" placeholder="Value" value={row.value} onChange={(e) => { const ni = [...impactCalculation]; ni[idx].value = e.target.value; setImpactCalculation(ni); }} />
-                <input type="text" className="input-field" placeholder="Calculation" value={row.calculation} onChange={(e) => { const ni = [...impactCalculation]; ni[idx].calculation = e.target.value; setImpactCalculation(ni); }} />
-                {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setImpactCalculation(impactCalculation.filter((_, i) => i !== idx))}>X</button>}
+            <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                <tbody>
+                  {impactCalculation.map((row, rIdx) => (
+                    <tr key={rIdx}>
+                      {Array.isArray(row) ? row.map((cell: string, cIdx: number) => (
+                        <td key={cIdx} style={{ position: 'relative', border: '1px solid var(--glass-border)', padding: '0' }}>
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={cell}
+                            onChange={e => {
+                              const newTable = [...impactCalculation];
+                              newTable[rIdx] = [...newTable[rIdx]];
+                              newTable[rIdx][cIdx] = e.target.value;
+                              setImpactCalculation(newTable);
+                            }}
+                            style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                          />
+                          {rIdx === 0 && impactCalculation[0].length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setImpactCalculation(impactCalculation.map((r: any) => Array.isArray(r) ? r.filter((_: any, i: number) => i !== cIdx) : r))}
+                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              - Col
+                            </button>
+                          )}
+                        </td>
+                      )) : (
+                        <td colSpan={4} style={{ padding: '0.5rem', color: 'red' }}>Legacy format detected. Please re-import as spreadsheet.</td>
+                      )}
+                      {impactCalculation.length > 1 && (
+                        <td style={{ width: '40px', textAlign: 'center' }}>
+                          <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setImpactCalculation(impactCalculation.filter((_: any, i: number) => i !== rIdx))}><X size={14}/></button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => {
+                  if (impactCalculation.length === 0) setImpactCalculation([[""]]);
+                  else setImpactCalculation([...impactCalculation, Array(impactCalculation[0].length).fill("")]);
+                }}><Plus size={14}/> Add Row</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => {
+                  if (impactCalculation.length === 0) setImpactCalculation([[""]]);
+                  else setImpactCalculation(impactCalculation.map((row: any) => Array.isArray(row) ? [...row, ""] : row));
+                }}><Plus size={14}/> Add Column</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("impact"); document.getElementById('tableImportInput')?.click(); }}>
+                  <Upload size={14} /> Import File
+                </button>
               </div>
-            ))}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }} onClick={() => setImpactCalculation([...impactCalculation, {parameter: "", value: "", calculation: ""}])}>+ Add Impact Row</button>
-              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("impact"); document.getElementById('tableImportInput')?.click(); }}>
-                <Upload size={14} /> Import
-              </button>
             </div>
             
             <label className="section-label">Why-Why Analysis</label>
@@ -493,24 +534,60 @@ function SubmitPageContent() {
             )}
 
             <label className="section-label">Action Taken Table</label>
-            {actionTakenTable.map((row, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input type="text" className="input-field" style={{ flex: 2 }} placeholder="Action Taken / Planned" value={row.action} onChange={(e) => { const na = [...actionTakenTable]; na[idx].action = e.target.value; setActionTakenTable(na); }} />
-                <input type="text" className="input-field" style={{ flex: 1 }} placeholder="Target (e.g. Shutdown)" value={row.target} onChange={(e) => { const na = [...actionTakenTable]; na[idx].target = e.target.value; setActionTakenTable(na); }} />
-                <select className="input-field" style={{ flex: 1 }} value={row.status} onChange={(e) => { const na = [...actionTakenTable]; na[idx].status = e.target.value; setActionTakenTable(na); }}>
-                   <option value="">Status...</option>
-                   <option value="Completed">Completed</option>
-                   <option value="In Progress">In Progress</option>
-                   <option value="Regular">Regular</option>
-                </select>
-                {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setActionTakenTable(actionTakenTable.filter((_, i) => i !== idx))}>X</button>}
+            <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                <tbody>
+                  {actionTakenTable.map((row, rIdx) => (
+                    <tr key={rIdx}>
+                      {Array.isArray(row) ? row.map((cell: string, cIdx: number) => (
+                        <td key={cIdx} style={{ position: 'relative', border: '1px solid var(--glass-border)', padding: '0' }}>
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={cell}
+                            onChange={e => {
+                              const newTable = [...actionTakenTable];
+                              newTable[rIdx] = [...newTable[rIdx]];
+                              newTable[rIdx][cIdx] = e.target.value;
+                              setActionTakenTable(newTable);
+                            }}
+                            style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                          />
+                          {rIdx === 0 && actionTakenTable[0].length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setActionTakenTable(actionTakenTable.map((r: any) => Array.isArray(r) ? r.filter((_: any, i: number) => i !== cIdx) : r))}
+                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                            >
+                              - Col
+                            </button>
+                          )}
+                        </td>
+                      )) : (
+                        <td colSpan={4} style={{ padding: '0.5rem', color: 'red' }}>Legacy format detected. Please re-import as spreadsheet.</td>
+                      )}
+                      {actionTakenTable.length > 1 && (
+                        <td style={{ width: '40px', textAlign: 'center' }}>
+                          <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setActionTakenTable(actionTakenTable.filter((_: any, i: number) => i !== rIdx))}><X size={14}/></button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => {
+                  if (actionTakenTable.length === 0) setActionTakenTable([[""]]);
+                  else setActionTakenTable([...actionTakenTable, Array(actionTakenTable[0].length).fill("")]);
+                }}><Plus size={14}/> Add Row</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => {
+                  if (actionTakenTable.length === 0) setActionTakenTable([[""]]);
+                  else setActionTakenTable(actionTakenTable.map((row: any) => Array.isArray(row) ? [...row, ""] : row));
+                }}><Plus size={14}/> Add Column</button>
+                <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("action"); document.getElementById('tableImportInput')?.click(); }}>
+                  <Upload size={14} /> Import File
+                </button>
               </div>
-            ))}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }} onClick={() => setActionTakenTable([...actionTakenTable, {action: "", target: "", status: ""}])}>+ Add Action Row</button>
-              <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }} onClick={() => { setFileImportTarget("action"); document.getElementById('tableImportInput')?.click(); }}>
-                <Upload size={14} /> Import
-              </button>
             </div>
 
             <label className="section-label" style={{ marginTop: '1rem', display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: 'var(--jspl-blue)' }}>Supporting Evidence</label>
@@ -595,10 +672,10 @@ function SubmitPageContent() {
           </>
         )}
         <div className="form-actions" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-          {activeTab === "best-practice" && !editId ? (
+          {(activeTab === "best-practice" || activeTab === "problem") && !editId ? (
             <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
-              setPendingSubmissionType("BestPractice");
-              setSupportingSlideType("BestPractice");
+              setPendingSubmissionType(activeTab === "best-practice" ? "BestPractice" : "RepetitiveProblem");
+              setSupportingSlideType(activeTab === "best-practice" ? "BestPractice" : "RepetitiveProblem");
               setActiveTab("supporting-slide");
             }}>
               Next: Add Supporting Slide (Mandatory)
@@ -612,16 +689,6 @@ function SubmitPageContent() {
               <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={(e) => handleSubmit(e, "Submitted")} disabled={loading}>
                 {loading ? (editId ? "Updating..." : "Submitting...") : (editId ? "Update Submission" : "Final Submit")}
               </button>
-
-              {activeTab === "problem" && !editId && (
-                <button type="button" className="btn" style={{ flex: 1, backgroundColor: '#e3f2fd', color: 'var(--jspl-blue)' }} onClick={() => {
-                  setPendingSubmissionType("RepetitiveProblem");
-                  setSupportingSlideType("RepetitiveProblem");
-                  setActiveTab("supporting-slide");
-                }}>
-                  Next: Add Supporting Slide (Optional)
-                </button>
-              )}
             </>
           )}
         </div>

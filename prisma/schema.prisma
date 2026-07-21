@@ -172,6 +172,8 @@ model SuggestionProgress {
   progress     Int
   notes        String?
   photoUrls    String[]
+  attachedFileUrl String?
+  attachedFileName String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
