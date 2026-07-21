@@ -77,3 +77,4 @@ npm run dev -- -p 4000
 - **PPT Generation**: `PptxGenJS`
 - **QR Codes**: `qrcode` & `qrcode.react` (Fully local, no external APIs used).
 
+
