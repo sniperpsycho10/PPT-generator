@@ -12,7 +12,8 @@ import {
   Settings,
   GitPullRequestDraft,
   MessageSquarePlus,
-  Users
+  Users,
+  Calendar
 } from "lucide-react";
 
 export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
@@ -58,6 +59,10 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <>
+          <Link href="/dashboard/cycles" className={getClassName("/dashboard/cycles")}>
+            <Calendar size={18} />
+            Cycles
+          </Link>
           <Link href="/dashboard/workshop" className={getClassName("/dashboard/workshop")}>
             <Presentation size={18} />
             Workshop Mode

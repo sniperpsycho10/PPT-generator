@@ -105,12 +105,31 @@ model Submission {
   customTable         String?      // Stored as JSON string (e.g. string[][])
   supportingImages    String[]     // Array of image URLs (up to 3)
 
+  // Cycle Linking
+  cycleId           String?
+  cycle             Cycle?       @relation(fields: [cycleId], references: [id])
+
   status            String       // "Draft", "Submitted", "Reviewed", "Accepted"
   submissionMonth   DateTime     @default(now())
   suggestions       Suggestion[]
   adoptions         Adoption[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+}
+
+model Cycle {
+  id          String       @id @default(uuid())
+  name        String       @unique // e.g., "June 2026"
+  month       String?
+  year        String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean      @default(true)
+  bpRemarks   String?
+  rpRemarks   String?
+  submissions Submission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Suggestion {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request) {
@@ -8,7 +8,11 @@ export async function POST(req: Request) {
     const data = await req.json();
     const session = await getServerSession(authOptions);
     
-    const userEmail = session?.user?.email || "dummy@jspl.com";
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const userEmail = session.user.email;
     
     let user = await prisma.user.findUnique({ 
       where: { email: userEmail },
@@ -62,6 +66,9 @@ export async function POST(req: Request) {
         supportingSlideType: data.supportingSlideType,
         customTable: data.customTable,
         supportingImages: data.supportingImages || [],
+        
+        // Cycle Mapping
+        cycleId: data.cycleId || null,
       }
     });
 
@@ -86,7 +93,11 @@ export async function GET() {
 
     const submissions = await prisma.submission.findMany({
       where: whereClause,
-      include: { department: true, suggestions: true },
+      include: { 
+        department: true, 
+        suggestions: { include: { assignedTeam: true } },
+        adoptions: { include: { user: { include: { department: true } } } }
+      },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json({ success: true, data: submissions });

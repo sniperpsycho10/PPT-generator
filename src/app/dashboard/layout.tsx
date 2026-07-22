@@ -10,6 +10,7 @@ import LiveToaster from "./LiveToaster";
 import SidebarNav from "./SidebarNav";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
+import DepartmentSelector from "./DepartmentSelector";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -18,7 +19,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/auth/login");
   }
 
-  const dbUser = await prisma.user.findUnique({ where: { id: (session.user as any).id } });
+  const dbUser = await prisma.user.findUnique({ 
+    where: { id: (session.user as any).id },
+    include: { department: true }
+  });
   
   if (!dbUser || dbUser.role === "Pending" || dbUser.role === "Rejected") {
     redirect("/pending-approval");
@@ -26,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const userRole = dbUser.role;
   const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const allDepartments = await prisma.department.findMany({ orderBy: { name: 'asc' } });
 
   return (
     <div className="dashboard-container">
@@ -74,8 +79,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
               )}
               <div className="profile-info">
                 <div className="profile-name">{session?.user?.name || 'User'}</div>
-                <div className={`badge badge-${userRole.toLowerCase().replace(' ', '-')}`}>
-                  {userRole}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className={`badge badge-${userRole.toLowerCase().replace(' ', '-')}`}>
+                    {userRole}
+                  </div>
+                  <DepartmentSelector 
+                    userId={dbUser.id} 
+                    currentDeptId={dbUser.departmentId} 
+                    currentDeptName={dbUser.department?.name} 
+                    isAdmin={isAdmin} 
+                    departments={allDepartments} 
+                  />
                 </div>
               </div>
               <div style={{ borderLeft: '1px solid rgba(0,0,0,0.1)', height: '24px', margin: '0 4px' }}></div>

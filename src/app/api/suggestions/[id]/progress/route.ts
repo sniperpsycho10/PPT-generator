@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
@@ -26,9 +26,11 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
 
     if (!suggestion) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const isMember = suggestion.assignedTeam?.members.some(m => m.id === userId);
-    if (!isAdmin && !isMember) {
-      return NextResponse.json({ error: "Forbidden: Not in assigned team" }, { status: 403 });
+    if (userRole === 'User') {
+      const isMember = suggestion.assignedTeam?.members.some((m: any) => m.id === userId);
+      if (!isMember) {
+        return NextResponse.json({ error: "Forbidden: Not in assigned team" }, { status: 403 });
+      }
     }
 
     const progressValue = parseInt(data.progress);

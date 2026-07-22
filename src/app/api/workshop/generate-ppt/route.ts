@@ -107,32 +107,44 @@ export async function POST(req: Request) {
     }
 
     // FETCH REAL DATA
-    let dbSubmissions = await prisma.submission.findMany({
-      where: { status: "Accepted" },
-      include: { department: true, suggestions: true }
+    let allSubmissions = await prisma.submission.findMany({
+      where: { status: { in: ["Submitted", "Accepted"] } },
+      include: { 
+        department: true, 
+        suggestions: { include: { assignedTeam: true } },
+        adoptions: { include: { user: { include: { department: true } } } }
+      }
     });
 
-    const bps = dbSubmissions.filter(s => s.type === "BestPractice");
-    const rps = dbSubmissions.filter(s => s.type === "RepetitiveProblem");
-    const ss = dbSubmissions.filter(s => s.type === "SupportingSlide");
+    const activeCycle = await prisma.cycle.findFirst({
+      where: { isActive: true }
+    });
+    const bpRemarks = activeCycle?.bpRemarks || "-";
+    const rpRemarks = activeCycle?.rpRemarks || "-";
+
+    let dbSubmissions = allSubmissions.filter((s: any) => s.status === "Accepted");
+
+    const bps = dbSubmissions.filter((s: any) => s.type === "BestPractice");
+    const rps = dbSubmissions.filter((s: any) => s.type === "RepetitiveProblem");
+    const ss = dbSubmissions.filter((s: any) => s.type === "SupportingSlide");
     
     const ordered: any[] = [];
-    const getSupporting = (t: string) => ss.find(s => s.title === `Supporting Doc: ${t}`);
+    const getSupporting = (t: string) => ss.find((s: any) => s.title === `Supporting Doc: ${t}`);
     
-    bps.forEach(bp => {
+    bps.forEach((bp: any) => {
       ordered.push(bp);
       const child = getSupporting(bp.title);
       if (child) ordered.push(child);
     });
     
-    rps.forEach(rp => {
+    rps.forEach((rp: any) => {
       ordered.push(rp);
       const child = getSupporting(rp.title);
       if (child) ordered.push(child);
     });
     
     const usedIds = new Set(ordered.map(s => s.id));
-    dbSubmissions.forEach(s => {
+    dbSubmissions.forEach((s: any) => {
       if (!usedIds.has(s.id)) ordered.push(s);
     });
     dbSubmissions = ordered;
@@ -187,7 +199,7 @@ export async function POST(req: Request) {
     agendaSlide.addText("🏢", { x: 7.3, y: 2.2, w: 1.8, h: 0.4, fontSize: 32, color: accentPrimary, align: "center" });
     agendaSlide.addText("HORIZONTAL\nDEPLOYMENT", { x: 7.3, y: 2.8, w: 1.8, h: 0.6, fontSize: 10, color: textHeading, bold: true, align: "center" });
 
-    dbSubmissions.forEach(sub => {
+    dbSubmissions.forEach((sub: any) => {
       let slide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
       
       const headerX = templateStyle === 'modern' ? 1.5 : 0.4;
@@ -504,72 +516,71 @@ export async function POST(req: Request) {
           { text: sub.title, options: { color: textBody, bold: false } }
         ], { x: headerX + 0.1, y: 0.6, w: 9, h: 0.3, fontSize: 18 });
         
+        let hasCustomTable = false;
         if (sub.customTable) {
           slide.addText("CUSTOM TABLE", { x: 0.4, y: 1.1, w: 9, h: 0.2, fontSize: 9, color: textHeading, bold: true });
           try {
             const parsedTable = JSON.parse(sub.customTable);
             if (Array.isArray(parsedTable) && parsedTable.length > 0) {
+              hasCustomTable = true;
               const numCols = Math.max(...parsedTable.map((r: any[]) => r?.length || 0));
-              const maxColsPerSlide = 8;
-              const numChunks = Math.ceil(numCols / maxColsPerSlide);
-
-              for (let chunk = 0; chunk < numChunks; chunk++) {
-                  const startCol = chunk * maxColsPerSlide;
-                  const endCol = Math.min(startCol + maxColsPerSlide, numCols);
-                  const chunkCols = endCol - startCol;
-                  
-                  let targetSlide = slide;
-                  if (chunk > 0) {
-                      targetSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
-                      targetSlide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.3, fill: { color: accentPrimary } });
-                      targetSlide.addText([
-                        { text: `SUPPORTING (Part ${chunk + 1}): `, options: { color: textHeading, bold: true } },
-                        { text: sub.title, options: { color: textBody, bold: false } }
-                      ], { x: headerX + 0.1, y: 0.6, w: 9, h: 0.3, fontSize: 18 });
+              const colW = Array(numCols).fill(9.2 / numCols);
+              let tableData: any[] = [];
+              
+              parsedTable.forEach((row: any[], rIdx: number) => {
+                const isHeader = rIdx === 0;
+                const paddedRow = Array.isArray(row) ? [...row] : [];
+                while(paddedRow.length < numCols) paddedRow.push("");
+                
+                tableData.push(paddedRow.map((cell: string) => ({
+                  text: String(cell || ""),
+                  options: {
+                    color: isHeader ? "FFFFFF" : textBody,
+                    fill: isHeader ? accentPrimary : cardBg,
+                    bold: isHeader
                   }
-                  
-                  targetSlide.addText(`CUSTOM TABLE${numChunks > 1 ? ` (Part ${chunk + 1})` : ''}`, { x: 0.4, y: 1.1, w: 9, h: 0.2, fontSize: 9, color: textHeading, bold: true });
-
-                  const colW = Array(chunkCols).fill(9.2 / chunkCols);
-                  let tableData: any[] = [];
-                  parsedTable.forEach((row: any[], rIdx: number) => {
-                    const isHeader = rIdx === 0;
-                    const paddedRow = Array.isArray(row) ? [...row] : [];
-                    while(paddedRow.length < numCols) paddedRow.push("");
-                    
-                    const chunkRow = paddedRow.slice(startCol, endCol);
-                    tableData.push(chunkRow.map((cell: string) => ({
-                      text: String(cell || ""),
-                      options: {
-                        color: isHeader ? "FFFFFF" : textBody,
-                        fill: isHeader ? accentPrimary : cardBg,
-                        bold: isHeader
-                      }
-                    })));
-                  });
-                  
-                  targetSlide.addTable(tableData, { 
-                    x: 0.4, y: 1.3, w: 9.2, 
-                    border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
-                    fill: { color: cardBg }, 
-                    fontSize: chunkCols > 6 ? 7 : (chunkCols > 4 ? 8 : 10), 
-                    colW: colW,
-                    autoPage: true,
-                    autoPageRepeatHeader: true,
-                    autoPageSlideStartY: 1.3
-                  });
-              }
+                })));
+              });
+              
+              slide.addTable(tableData, { 
+                x: 0.4, y: 1.3, w: 9.2, 
+                border: { type: 'solid', color: isDarkMode ? cardLine : 'FFFFFF', pt: 1 },
+                fill: { color: cardBg }, 
+                fontSize: numCols > 10 ? 5 : (numCols > 7 ? 6 : (numCols > 5 ? 7 : 9)), 
+                colW: colW,
+                autoPage: true,
+                autoPageRepeatHeader: true,
+                autoPageSlideStartY: 1.3
+              });
             }
           } catch(e) {}
         }
 
         if (sub.supportingImages && sub.supportingImages.length > 0) {
-          slide.addText("SUPPORTING PICTURES", { x: 0.4, y: 3.5, w: 9, h: 0.2, fontSize: 9, color: accentPrimary, bold: true });
+          let targetImgSlide = slide;
+          let titleY = 3.5;
+          let imgY = 3.7;
+
+          if (hasCustomTable) {
+             targetImgSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+             if (templateStyle === 'corporate') {
+               targetImgSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.5, h: 5.625, fill: { color: "2C3E50" } });
+             }
+             targetImgSlide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.3, fill: { color: accentPrimary } });
+             targetImgSlide.addText([
+                { text: "SUPPORTING (Pictures): ", options: { color: textHeading, bold: true } },
+                { text: sub.title, options: { color: textBody, bold: false } }
+             ], { x: headerX + 0.1, y: 0.6, w: 9, h: 0.3, fontSize: 18 });
+             titleY = 1.1;
+             imgY = 1.3;
+          }
+
+          targetImgSlide.addText("SUPPORTING PICTURES", { x: 0.4, y: titleY, w: 9, h: 0.2, fontSize: 9, color: accentPrimary, bold: true });
           let imgX = 0.4;
           sub.supportingImages.forEach((img: string) => {
              const imgPath = path.join(process.cwd(), "public", img);
              if (fs.existsSync(imgPath)) {
-                 slide.addImage({ path: imgPath, x: imgX, y: 3.7, w: 2.8, h: 1.6, sizing: { type: 'contain', w: 2.8, h: 1.6 } });
+                 targetImgSlide.addImage({ path: imgPath, x: imgX, y: imgY, w: 2.8, h: 1.6, sizing: { type: 'contain', w: 2.8, h: 1.6 } });
              }
              imgX += 3.0;
           });
@@ -599,6 +610,123 @@ export async function POST(req: Request) {
       }
     });
 
+    // TRACKER SLIDE
+    const totalBP = allSubmissions.filter((s: any) => s.type === "BestPractice").length;
+    const accBP = bps.length;
+    const totalRP = allSubmissions.filter((s: any) => s.type === "RepetitiveProblem").length;
+    const accRP = rps.length;
+
+    let trkSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+    trkSlide.addText("Tracker", { x: 0.5, y: 0.5, w: 9, h: 0.8, fontSize: 32, bold: true, color: textHeading, align: 'center' });
+    trkSlide.addText("Monthly Maintenance Workshop", { x: 0.5, y: 1.3, w: 9, h: 0.5, fontSize: 20, color: textHeading, align: 'center' });
+
+    let trackerRows: any[][] = [
+      [
+        { text: "Category", options: { bold: true, color: "FFFFFF", fill: accentTertiary } },
+        { text: "Total Nos. of Entries", options: { bold: true, color: "FFFFFF", fill: accentTertiary } },
+        { text: "Nos. of entries for Action", options: { bold: true, color: "FFFFFF", fill: accentTertiary } },
+        { text: "Remarks", options: { bold: true, color: "FFFFFF", fill: accentTertiary } }
+      ],
+      [
+        { text: "Best Practice", options: { fill: cardBg, color: textBody } },
+        { text: totalBP < 10 ? `0${totalBP}` : `${totalBP}`, options: { fill: cardBg, color: textBody, align: 'center' } },
+        { text: accBP < 10 ? `0${accBP}` : `${accBP}`, options: { fill: cardBg, color: textBody, align: 'center' } },
+        { text: bpRemarks, options: { fill: cardBg, color: textBody, align: 'center' } }
+      ],
+      [
+        { text: "Repetitive Problem", options: { fill: cardBg, color: textBody } },
+        { text: totalRP < 10 ? `0${totalRP}` : `${totalRP}`, options: { fill: cardBg, color: textBody, align: 'center' } },
+        { text: accRP < 10 ? `0${accRP}` : `${accRP}`, options: { fill: cardBg, color: textBody, align: 'center' } },
+        { text: rpRemarks, options: { fill: cardBg, color: textBody, align: 'center' } }
+      ]
+    ];
+    trkSlide.addTable(trackerRows as any, { x: 0.5, y: 2.2, w: 9, colW: [2, 2, 2, 3], border: { pt: 1, color: "CCCCCC" }, rowH: 0.4, valign: 'middle', fontSize: 12 });
+
+    // HORIZONTAL DEPLOYMENT TRACKER SLIDE
+    let hdSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+    hdSlide.addText([
+      { text: "Best Practice: ", options: { bold: true, color: accentTertiary } },
+      { text: "Monthly Maintenance Workshop", options: { bold: false, color: textHeading } }
+    ], { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 24 });
+    hdSlide.addText("Horizontal Deployment Tracker:", { x: 0.5, y: 0.8, w: 9, h: 0.4, fontSize: 20, bold: true, color: textHeading });
+
+    let hdRows: any[][] = [
+      [
+        { text: "Department", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Best Practice Title", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Area/ Department to be Implemented", options: { bold: true, color: "FFFFFF", fill: "1A365D", align: "center" } },
+        { text: "Deadline", options: { bold: true, color: "FFFFFF", fill: "1A365D", align: "center" } },
+        { text: "Remarks", options: { bold: true, color: "FFFFFF", fill: "1A365D" } }
+      ]
+    ];
+
+    bps.forEach((bp: any) => {
+      const adoptions = bp.adoptions || [];
+      const hasAdoptions = adoptions.length > 0;
+      const rowFill = hasAdoptions ? "C6F6D5" : cardBg;
+      
+      hdRows.push([
+        { text: bp.department?.name || "-", options: { fill: rowFill, color: "000000" } },
+        { text: bp.title, options: { fill: rowFill, color: "000000" } },
+        { text: hasAdoptions ? adoptions.map((a:any) => a.user?.department?.name || 'Unknown').join(', ') : "-", options: { fill: rowFill, color: "000000", bold: hasAdoptions, align: 'center' } },
+        { text: hasAdoptions ? "30.12.2026" : "-", options: { fill: rowFill, color: "000000", bold: hasAdoptions, align: 'center' } },
+        { text: "-", options: { fill: rowFill, color: "000000", align: 'center' } }
+      ]);
+    });
+    
+    if (hdRows.length === 1) {
+      hdRows.push([{ text: "No Best Practices recorded yet.", options: { colspan: 5, fill: cardBg, color: textBody, align: 'center' } } as any]);
+    }
+    
+    hdSlide.addTable(hdRows as any, { x: 0.2, y: 1.4, w: 9.6, colW: [1.2, 2.8, 2, 1, 2.6], border: { pt: 1, color: "CCCCCC" }, rowH: 0.4, valign: 'middle', fontSize: 10, autoPage: true });
+
+    // SUGGESTION TRACKER SLIDE
+    let stSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+    stSlide.addText([
+      { text: "Repetitive Problem: ", options: { bold: true, color: "E53E3E" } },
+      { text: "Monthly Maintenance Workshop", options: { bold: false, color: textHeading } }
+    ], { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 24 });
+    stSlide.addText("Suggestion Tracker:", { x: 0.5, y: 0.8, w: 9, h: 0.4, fontSize: 20, bold: true, color: textHeading });
+
+    let stRows: any[][] = [
+      [
+        { text: "Dept.", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Equipment Details", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Problem Statement", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Discussion/ Initial Suggestion during workshop", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Suggester Name", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Team name for Analyse the problem", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Analysis Target Date", options: { bold: true, color: "FFFFFF", fill: "1A365D" } },
+        { text: "Remarks", options: { bold: true, color: "FFFFFF", fill: "1A365D" } }
+      ]
+    ];
+
+    rps.forEach((rp: any) => {
+      const suggestions = rp.suggestions || [];
+      const hasSug = suggestions.length > 0;
+      const sugText = hasSug ? suggestions.map((s:any) => s.suggestionText).join('\n') : "After visiting the site.";
+      const sugName = hasSug ? suggestions.map((s:any) => s.guestName || s.suggestedBy?.name || "-").join(', ') : "-";
+      const sugTeam = suggestions.map((s:any) => s.assignedTeam?.name).filter(Boolean).join(', ') || "-";
+      const sugRemarks = suggestions.map((s:any) => s.trackingRemarks).filter(Boolean).join(', ') || "-";
+      
+      stRows.push([
+        { text: rp.department?.name || "-", options: { fill: cardBg, color: textBody } },
+        { text: rp.equipment || "-", options: { fill: cardBg, color: textBody } },
+        { text: rp.problemStatement || "-", options: { fill: cardBg, color: textBody } },
+        { text: sugText, options: { fill: cardBg, color: "38A169", bold: true } },
+        { text: sugName, options: { fill: hasSug ? "FAF089" : cardBg, color: "000000" } },
+        { text: sugTeam, options: { fill: cardBg, color: textBody } },
+        { text: "10.06.2026", options: { fill: cardBg, color: textBody } },
+        { text: sugRemarks, options: { fill: cardBg, color: textBody } }
+      ]);
+    });
+    
+    if (stRows.length === 1) {
+      stRows.push([{ text: "No Repetitive Problems recorded yet.", options: { colspan: 8, fill: cardBg, color: textBody, align: 'center' } } as any]);
+    }
+    
+    stSlide.addTable(stRows as any, { x: 0.1, y: 1.4, w: 9.8, colW: [0.8, 1.2, 1.4, 2, 1, 1.2, 1, 1.2], border: { pt: 1, color: "CCCCCC" }, rowH: 0.4, valign: 'middle', fontSize: 8, autoPage: true });
+
     // FEEDBACK GALLERY SLIDE
     const suggestions = await prisma.suggestion.findMany({ where: { status: "Accepted", submissionId: null } });
     if (suggestions.length > 0) {
@@ -611,7 +739,7 @@ export async function POST(req: Request) {
       fbSlide.addText("OUTSTANDING SUGGESTIONS", { x: headerX + 0.1, y: 0.6, w: 8, h: 0.4, fontSize: 24, bold: true, color: textHeading });
       
       let startY = 1.5;
-      suggestions.slice(0, 4).forEach((s) => {
+      suggestions.slice(0, 4).forEach((s: any) => {
         fbSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: startY, w: 9, h: 0.8, fill: { color: cardBg }, line: { color: accentPrimary, width: 2 }, rectRadius: 0.1 });
         fbSlide.addText(`"${s.suggestionText}"`, { x: 0.6, y: startY + 0.1, w: 8.8, h: 0.4, fontSize: 14, italic: true, color: textBody });
         fbSlide.addText(`— ${s.guestName || "Anonymous"} (${s.guestDept || "General"} Dept)`, { x: 0.6, y: startY + 0.45, w: 8.8, h: 0.2, fontSize: 10, bold: true, color: textHeading });

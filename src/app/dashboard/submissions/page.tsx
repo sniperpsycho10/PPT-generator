@@ -3,7 +3,7 @@ import prisma from "@/lib/db";
 import Link from "next/link";
 import ActionButtons from "./ActionButtons";
 
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';

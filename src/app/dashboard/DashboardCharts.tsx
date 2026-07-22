@@ -27,7 +27,21 @@ ChartJS.register(
   Filler
 );
 
-export default function DashboardCharts() {
+interface DashboardChartsProps {
+  trendLabels: string[];
+  bestPracticesData: number[];
+  repetitiveProblemsData: number[];
+  impactLabels: string[];
+  impactDataValues: number[];
+}
+
+export default function DashboardCharts({
+  trendLabels,
+  bestPracticesData,
+  repetitiveProblemsData,
+  impactLabels,
+  impactDataValues
+}: DashboardChartsProps) {
   const trendOptions = {
     responsive: true,
     plugins: {
@@ -39,12 +53,12 @@ export default function DashboardCharts() {
     }
   };
 
-  const trendData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+  const trendDataObj = {
+    labels: trendLabels,
     datasets: [
       {
         label: 'Best Practices',
-        data: [12, 19, 15, 22, 28, 24],
+        data: bestPracticesData,
         borderColor: 'rgba(10, 61, 98, 1)',
         backgroundColor: 'rgba(10, 61, 98, 0.2)',
         fill: true,
@@ -52,7 +66,7 @@ export default function DashboardCharts() {
       },
       {
         label: 'Repetitive Problems',
-        data: [5, 8, 4, 10, 6, 7],
+        data: repetitiveProblemsData,
         borderColor: 'rgba(255, 127, 80, 1)',
         backgroundColor: 'rgba(255, 127, 80, 0.2)',
         fill: true,
@@ -72,12 +86,12 @@ export default function DashboardCharts() {
     }
   };
 
-  const impactData = {
-    labels: ['Rail Mill', 'Plate Mill', 'Steel Melting', 'Power Plant', 'Coke Oven'],
+  const impactDataObj = {
+    labels: impactLabels,
     datasets: [
       {
         label: 'Savings (Rs. Lakhs)',
-        data: [26.45, 20.0, 15.5, 30.2, 10.1],
+        data: impactDataValues,
         backgroundColor: [
           'rgba(10, 61, 98, 0.8)',
           'rgba(255, 127, 80, 0.8)',
@@ -92,10 +106,14 @@ export default function DashboardCharts() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
       <div className="card glass" style={{ padding: '1.5rem', backgroundColor: '#fff' }}>
-        <Line options={trendOptions} data={trendData} />
+        <Line options={trendOptions} data={trendDataObj} />
       </div>
       <div className="card glass" style={{ padding: '1.5rem', backgroundColor: '#fff' }}>
-        <Bar options={impactOptions} data={impactData} />
+        {impactLabels.length > 0 ? (
+           <Bar options={impactOptions} data={impactDataObj} />
+        ) : (
+           <div style={{ textAlign: 'center', color: '#999', marginTop: '2rem' }}>No impact data available</div>
+        )}
       </div>
     </div>
   );

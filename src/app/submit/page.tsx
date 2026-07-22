@@ -19,6 +19,10 @@ function SubmitPageContent() {
 
   const [title, setTitle] = useState("");
   
+  // Cycle fields
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [selectedCycleId, setSelectedCycleId] = useState<string>("");
+  
   // Best Practice fields
   const [objective, setObjective] = useState("");
   const [problemAddressed, setProblemAddressed] = useState("");
@@ -52,6 +56,22 @@ function SubmitPageContent() {
   const [suppImg1, setSuppImg1] = useState<File | null>(null);
   const [suppImg2, setSuppImg2] = useState<File | null>(null);
   const [suppImg3, setSuppImg3] = useState<File | null>(null);
+
+  useEffect(() => {
+    // Prevent hydration mismatch by rendering default states safely
+    fetch('/api/cycles')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const activeCycles = data.data.filter((c: any) => c.isActive);
+          setCycles(activeCycles);
+          if (activeCycles.length > 0) {
+            setSelectedCycleId(activeCycles[0].id);
+          }
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (editId) {
@@ -238,7 +258,8 @@ function SubmitPageContent() {
           status: submitStatus,
           objective, problemAddressed, methodology, impactSavings: parseFloat(impactSavings) || 0, calculationTable: JSON.stringify(calculationTable),
           equipmentDetails, problemStatement, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
-          supportingSlideType: pendingSubmissionType, customTable: "[]", supportingImages: []
+          supportingSlideType: pendingSubmissionType, customTable: "[]", supportingImages: [],
+          cycleId: selectedCycleId || null
         };
         if (beforeImage) parentPayload.beforeImageUrl = await uploadImage(beforeImage) || "";
         if (afterImage) parentPayload.afterImageUrl = await uploadImage(afterImage) || "";
@@ -255,7 +276,8 @@ function SubmitPageContent() {
           equipmentDetails, problemStatement, whyWhyAnalysis: "[]", impactCalculation: "[]", actionTakenTable: "[]",
           supportingSlideType: pendingSubmissionType,
           customTable: JSON.stringify(customTable),
-          supportingImages: []
+          supportingImages: [],
+          cycleId: selectedCycleId || null
         };
         let i1 = ""; let i2 = ""; let i3 = "";
         if (suppImg1) i1 = await uploadImage(suppImg1) || "";
@@ -273,7 +295,8 @@ function SubmitPageContent() {
           status: submitStatus,
           objective, problemAddressed, methodology, impactSavings: parseFloat(impactSavings) || 0, calculationTable: JSON.stringify(calculationTable),
           equipmentDetails, problemStatement, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
-          supportingSlideType, customTable: JSON.stringify(customTable), supportingImages: []
+          supportingSlideType, customTable: JSON.stringify(customTable), supportingImages: [],
+          cycleId: selectedCycleId || null
         };
 
         if (activeTab === "supporting-slide") {
@@ -305,6 +328,24 @@ function SubmitPageContent() {
       <div className="submit-header">
         <h1>{editId ? "Edit Submission" : "Monthly Workshop Submission"}</h1>
         <p>{editId ? "Update your previously submitted details" : "Submit your department's monthly data for the presentation"}</p>
+        
+        {!editId && cycles.length > 0 && selectedCycleId && (
+          <div style={{ marginTop: '1.5rem', background: 'rgba(10, 61, 98, 0.1)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid var(--jspl-accent)', display: 'inline-block' }}>
+            {(() => {
+              const activeCycle = cycles.find(c => c.id === selectedCycleId);
+              if (!activeCycle) return null;
+              
+              const diffTime = Math.max(0, new Date(activeCycle.endDate).getTime() - new Date().getTime());
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              
+              return (
+                <div style={{ fontWeight: 'bold', color: 'var(--jspl-blue)' }}>
+                  {diffDays > 0 ? `⏳ ${diffDays} days left for submission in the ${activeCycle.name} cycle!` : `⚠️ The ${activeCycle.name} cycle window closes today!`}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       <input type="file" id="tableImportInput" style={{ display: 'none' }} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileUpload} />
@@ -355,12 +396,23 @@ function SubmitPageContent() {
             </label>
           </div>
 
-          <form className="submit-form glass">
+          <form onSubmit={(e) => handleSubmit(e, "Submitted")} className="submit-form glass">
 
-        <div className="form-group">
+        <div className="form-group" style={{ marginBottom: '1.5rem' }}>
           <label>Submission Title</label>
           <input type="text" className="input-field" placeholder="e.g., Blade Thickness Optimization" value={title} onChange={(e)=>setTitle(e.target.value)} required />
         </div>
+
+        {!editId && cycles.length > 0 && (
+          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+            <label className="section-label">Select Cycle</label>
+            <select className="input-field" value={selectedCycleId} onChange={(e)=>setSelectedCycleId(e.target.value)} required>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {activeTab === "best-practice" ? (
           <>
@@ -405,7 +457,7 @@ function SubmitPageContent() {
                             <button 
                               type="button" 
                               onClick={() => setCalculationTable(calculationTable.map(r => Array.isArray(r) ? r.filter((_, i) => i !== cIdx) : r))} 
-                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                              style={{ display: 'block', margin: '4px auto', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
                             >
                               - Col
                             </button>
@@ -489,7 +541,7 @@ function SubmitPageContent() {
                             <button
                               type="button"
                               onClick={() => setImpactCalculation(impactCalculation.map((r: any) => Array.isArray(r) ? r.filter((_: any, i: number) => i !== cIdx) : r))}
-                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                              style={{ display: 'block', margin: '4px auto', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
                             >
                               - Col
                             </button>
@@ -557,7 +609,7 @@ function SubmitPageContent() {
                             <button
                               type="button"
                               onClick={() => setActionTakenTable(actionTakenTable.map((r: any) => Array.isArray(r) ? r.filter((_: any, i: number) => i !== cIdx) : r))}
-                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                              style={{ display: 'block', margin: '4px auto', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
                             >
                               - Col
                             </button>
@@ -629,7 +681,7 @@ function SubmitPageContent() {
                             <button 
                               type="button" 
                               onClick={() => removeCustomCol(cIdx)} 
-                              style={{ position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
+                              style={{ display: 'block', margin: '4px auto', background: '#ffebee', color: '#d32f2f', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '2px 6px', fontSize: '10px' }}
                             >
                               - Col
                             </button>

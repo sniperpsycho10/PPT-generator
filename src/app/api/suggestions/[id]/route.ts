@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
@@ -28,7 +28,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
       });
       if (team && team.members.length > 0) {
         await prisma.notification.createMany({
-          data: team.members.map((m) => ({
+          data: team.members.map((m: any) => ({
             userId: m.id,
             title: "New Assignment",
             message: `Your team (${team.name}) has been assigned a new suggestion: ${updated.suggestionText || 'View details'}`,

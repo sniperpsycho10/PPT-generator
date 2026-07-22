@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
@@ -86,6 +86,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         supportingSlideType: data.supportingSlideType,
         customTable: data.customTable,
         supportingImages: data.supportingImages || [],
+        cycleId: data.cycleId || null
       }
     });
 

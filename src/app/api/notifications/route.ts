@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 export async function GET(req: Request) {
@@ -13,6 +13,53 @@ export async function GET(req: Request) {
     const userId = (session.user as any).id;
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Dynamic deadline reminder generation for active cycles
+    const activeCycles = await prisma.cycle.findMany({
+      where: { isActive: true }
+    });
+
+    const newNotifications = [];
+    for (const cycle of activeCycles) {
+      // Normalize both dates to midnight UTC to prevent time-of-day math errors
+      const end = new Date(cycle.endDate);
+      end.setUTCHours(0,0,0,0);
+      
+      const today = new Date();
+      today.setUTCHours(0,0,0,0);
+      
+      const diffTime = end.getTime() - today.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays <= 7 && diffDays >= 0) {
+        const title = `Deadline Reminder: ${cycle.name}`;
+        const message = diffDays === 0 
+          ? `The ${cycle.name} cycle window closes TODAY! Please submit your data immediately.`
+          : `Only ${diffDays} days left until the ${cycle.name} cycle closes.`;
+          
+        const alreadyNotified = await prisma.notification.findFirst({
+          where: {
+            userId: userId,
+            title: title,
+            message: message
+          }
+        });
+        
+        if (!alreadyNotified) {
+          newNotifications.push({
+            userId,
+            title,
+            message,
+            isRead: false,
+            link: "/dashboard/submit-suggestion"
+          });
+        }
+      }
+    }
+    
+    if (newNotifications.length > 0) {
+      await prisma.notification.createMany({ data: newNotifications });
     }
 
     // Fetch top 10 notifications for the user (both read and unread)

@@ -11,7 +11,7 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
     }
 
-    const { role } = await req.json();
+    const { role, departmentId } = await req.json();
     const params = await props.params;
     const targetUserId = params.id;
     
@@ -21,9 +21,15 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
       return NextResponse.json({ success: false, error: "Only Super Admins can modify Super Admins" }, { status: 403 });
     }
 
+    const dataToUpdate: any = {};
+    if (role !== undefined) dataToUpdate.role = role;
+    if (departmentId !== undefined) {
+      dataToUpdate.departmentId = departmentId === "" ? null : departmentId;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
-      data: { role }
+      data: dataToUpdate
     });
     
     return NextResponse.json({ success: true, data: updatedUser });

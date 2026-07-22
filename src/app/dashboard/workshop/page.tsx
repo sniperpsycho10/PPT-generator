@@ -8,11 +8,13 @@ import "./workshop.css";
 export default function WorkshopMode() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [origin, setOrigin] = useState<string>('');
   const [templateStyle, setTemplateStyle] = useState<string>('corporate');
   const [isSlideQrEnlarged, setIsSlideQrEnlarged] = useState(false);
+  const [activeCycleRemarks, setActiveCycleRemarks] = useState({ bpRemarks: "-", rpRemarks: "-" });
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,10 +26,26 @@ export default function WorkshopMode() {
       })
       .catch(() => setOrigin(window.location.origin));
     
+    fetch('/api/cycles')
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && res.data) {
+          const active = res.data.find((c: any) => c.isActive);
+          if (active) {
+            setActiveCycleRemarks({
+              bpRemarks: active.bpRemarks || "-",
+              rpRemarks: active.rpRemarks || "-"
+            });
+          }
+        }
+      })
+      .catch(console.error);
+    
     fetch('/api/submissions')
       .then(r => r.json())
       .then(res => {
         if (res.data) {
+          setAllSubmissions(res.data);
           const accepted = res.data.filter((s: any) => s.status === 'Accepted');
           const bps = accepted.filter((s: any) => s.type === "BestPractice");
           const rps = accepted.filter((s: any) => s.type === "RepetitiveProblem");
@@ -75,11 +93,14 @@ export default function WorkshopMode() {
       .catch(console.error);
   }, []);
 
-  // Generate the slides sequence: Cover -> Agenda -> [Submissions] -> Accepted Feedback -> QR Code
+  // Generate the slides sequence: Cover -> Agenda -> [Submissions] -> Trackers -> Accepted Feedback -> QR Code
   const slides = [
     { type: "Cover" },
     { type: "Agenda" },
     ...submissions,
+    { type: "TrackerSlide" },
+    { type: "HorizontalDeploymentSlide" },
+    { type: "SuggestionTrackerSlide" },
     { type: "FeedbackGallery" },
     { type: "QRCodeFeedback" }
   ];
@@ -343,6 +364,158 @@ export default function WorkshopMode() {
             <QRCodeSVG value={origin ? `${origin}/feedback` : ""} size={300} includeMargin={false} />
           </div>
         </div>
+      );
+    }
+
+    if (currentSlide.type === "TrackerSlide") {
+      const totalBP = allSubmissions.filter(s => s.type === "BestPractice").length;
+      const accBP = allSubmissions.filter(s => s.type === "BestPractice" && s.status === "Accepted").length;
+      const totalRP = allSubmissions.filter(s => s.type === "RepetitiveProblem").length;
+      const accRP = allSubmissions.filter(s => s.type === "RepetitiveProblem" && s.status === "Accepted").length;
+ 
+      return renderWrapper(
+         <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <h1 style={{ color: t.heading, fontSize: '3.5rem', marginBottom: '1rem', fontWeight: 'bold' }}>Tracker</h1>
+            <h2 style={{ color: t.heading, fontSize: '2rem', marginBottom: '3rem', opacity: 0.8 }}>Monthly Maintenance Workshop</h2>
+            <table style={{ width: '90%', borderCollapse: 'collapse', textAlign: 'left', backgroundColor: t.cardBg, color: t.text, fontSize: '1.2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+              <thead>
+                <tr style={{ backgroundColor: t.accent, color: 'white' }}>
+                  <th style={{ padding: '1rem', border: '1px solid #e2e8f0' }}>Category</th>
+                  <th style={{ padding: '1rem', border: '1px solid #e2e8f0' }}>Total Nos. of Entries</th>
+                  <th style={{ padding: '1rem', border: '1px solid #e2e8f0' }}>Nos. of entries for Action</th>
+                  <th style={{ padding: '1rem', border: '1px solid #e2e8f0' }}>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: `1px solid #e2e8f0`, backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0' }}>Best Practice</td>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>{totalBP < 10 ? `0${totalBP}` : totalBP}</td>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>{accBP < 10 ? `0${accBP}` : accBP}</td>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>{activeCycleRemarks.bpRemarks}</td>
+                </tr>
+                <tr style={{ borderBottom: `1px solid #e2e8f0` }}>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0' }}>Repetitive Problem</td>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>{totalRP < 10 ? `0${totalRP}` : totalRP}</td>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>{accRP < 10 ? `0${accRP}` : accRP}</td>
+                  <td style={{ padding: '1rem', border: '1px solid #e2e8f0', textAlign: 'center' }}>{activeCycleRemarks.rpRemarks}</td>
+                </tr>
+              </tbody>
+            </table>
+         </div>
+      );
+    }
+
+    if (currentSlide.type === "HorizontalDeploymentSlide") {
+      const acceptedBP = allSubmissions.filter(s => s.type === "BestPractice" && s.status === "Accepted");
+ 
+      return renderWrapper(
+         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ color: t.accent, fontSize: '2rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Best Practice: <span style={{ color: t.heading, fontWeight: 'normal' }}>Monthly Maintenance Workshop</span></h2>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ width: '6px', height: '30px', backgroundColor: '#F6AD55', marginRight: '1rem' }}></div>
+              <h3 style={{ color: t.heading, fontSize: '1.8rem', margin: 0, fontWeight: 'bold' }}>Horizontal Deployment Tracker:</h3>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', backgroundColor: t.cardBg, color: t.text, fontSize: '0.9rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#1A365D', color: 'white' }}>
+                    <th style={{ padding: '0.8rem', border: '1px solid #CBD5E0' }}>Department</th>
+                    <th style={{ padding: '0.8rem', border: '1px solid #CBD5E0' }}>Best Practice Title</th>
+                    <th style={{ padding: '0.8rem', border: '1px solid #CBD5E0', textAlign: 'center' }}>Area/ Department to be Implemented</th>
+                    <th style={{ padding: '0.8rem', border: '1px solid #CBD5E0', textAlign: 'center' }}>Deadline</th>
+                    <th style={{ padding: '0.8rem', border: '1px solid #CBD5E0' }}>Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {acceptedBP.map((bp: any, idx: number) => {
+                    const adoptions = bp.adoptions || [];
+                    const hasAdoptions = adoptions.length > 0;
+                    return (
+                      <tr key={idx} style={{ backgroundColor: hasAdoptions ? '#C6F6D5' : 'transparent', borderBottom: '1px solid #CBD5E0' }}>
+                        <td style={{ padding: '0.8rem', border: '1px solid #CBD5E0' }}>{bp.department?.name || "-"}</td>
+                        <td style={{ padding: '0.8rem', border: '1px solid #CBD5E0' }}>{bp.title}</td>
+                        <td style={{ padding: '0.8rem', border: '1px solid #CBD5E0', fontWeight: hasAdoptions ? 'bold' : 'normal', textAlign: 'center' }}>
+                          {hasAdoptions ? adoptions.map((a:any) => a.user?.department?.name || 'Unknown').join(', ') : "-"}
+                        </td>
+                        <td style={{ padding: '0.8rem', border: '1px solid #CBD5E0', fontWeight: hasAdoptions ? 'bold' : 'normal', textAlign: 'center' }}>
+                          {hasAdoptions ? "30.12.2026" : "-"}
+                        </td>
+                        <td style={{ padding: '0.8rem', border: '1px solid #CBD5E0', textAlign: 'center' }}>
+                          -
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {acceptedBP.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '1rem', textAlign: 'center' }}>No Best Practices recorded yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+         </div>
+      );
+    }
+
+    if (currentSlide.type === "SuggestionTrackerSlide") {
+      const acceptedRP = allSubmissions.filter(s => s.type === "RepetitiveProblem" && s.status === "Accepted");
+ 
+      return renderWrapper(
+         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <h2 style={{ color: '#E53E3E', fontSize: '2rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Repetitive Problem: <span style={{ color: t.heading, fontWeight: 'normal' }}>Monthly Maintenance Workshop</span></h2>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ width: '6px', height: '30px', backgroundColor: '#F6AD55', marginRight: '1rem' }}></div>
+              <h3 style={{ color: t.heading, fontSize: '1.8rem', margin: 0, fontWeight: 'bold' }}>Suggestion Tracker:</h3>
+            </div>
+            
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', backgroundColor: t.cardBg, color: t.text, fontSize: '0.8rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#1A365D', color: 'white' }}>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Dept.</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Equipment Details</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Problem Statement</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0', width: '20%' }}>Discussion/ Initial Suggestion during workshop</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Suggester Name</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Team name for Analyse the problem</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Analysis Target Date</th>
+                    <th style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {acceptedRP.map((rp: any, idx: number) => {
+                    const suggestions = rp.suggestions || [];
+                    
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #CBD5E0', backgroundColor: idx % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent' }}>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>{rp.department?.name || "-"}</td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>{rp.equipment || "-"}</td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>{rp.problemStatement || "-"}</td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0', color: '#38A169', fontWeight: 'bold' }}>
+                          {suggestions.length > 0 ? suggestions.map((s:any) => s.suggestionText).join('\n') : "After visiting the site."}
+                        </td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0', backgroundColor: suggestions.length > 0 ? '#FAF089' : 'transparent', color: suggestions.length > 0 ? '#000' : 'inherit' }}>
+                          {suggestions.length > 0 ? suggestions.map((s:any) => s.guestName || s.suggestedBy?.name || "-").join(', ') : "-"}
+                        </td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>
+                          {suggestions.map((s:any) => s.assignedTeam?.name).filter(Boolean).join(', ') || "-"}
+                        </td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>
+                          10.06.2026
+                        </td>
+                        <td style={{ padding: '0.6rem', border: '1px solid #CBD5E0' }}>
+                          {suggestions.map((s:any) => s.trackingRemarks).filter(Boolean).join(', ') || "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {acceptedRP.length === 0 && (
+                    <tr><td colSpan={8} style={{ padding: '1rem', textAlign: 'center' }}>No Repetitive Problems recorded yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+         </div>
       );
     }
 
