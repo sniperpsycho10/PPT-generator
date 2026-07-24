@@ -2,8 +2,186 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { X } from "lucide-react";
+import { X, Plus, Image as ImageIcon } from "lucide-react";
 import "./workshop.css";
+
+const uploadImage = async (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    return data.success ? data.url : null;
+  } catch(e) {
+    return null;
+  }
+};
+
+function LiveEditModal({ slide, onSave, onClose }: { slide: any, onSave: (s: any) => void, onClose: () => void }) {
+  const [data, setData] = useState<any>(JSON.parse(JSON.stringify(slide)));
+  const [uploading, setUploading] = useState<string | null>(null);
+
+  const tableFields = ['calculationTable', 'impactCalculation', 'actionTakenTable'];
+  const imageFields = ['beforeImageUrl', 'afterImageUrl', 'attachmentUrl'];
+  const arrayFields = ['whyWhyAnalysis'];
+  const skipFields = ['id', 'status', 'type', 'userId', 'departmentId', 'createdAt', 'updatedAt', 'department', 'suggestions', 'adoptions', 'submissionMonth', 'customTable'];
+
+  const handleTextChange = (k: string, v: string) => setData({ ...data, [k]: v });
+
+  const renderTableEditor = (key: string) => {
+    let table: any[] = [];
+    try { table = JSON.parse(data[key] || "[]"); } catch(e) {}
+    
+    // Upgrade legacy array of objects to 2D string array
+    if (Array.isArray(table) && table.length > 0 && !Array.isArray(table[0]) && typeof table[0] === 'object') {
+      const keys = Object.keys(table[0]);
+      const newTable = [keys];
+      table.forEach(row => {
+        newTable.push(keys.map(k => String(row[k] || '')));
+      });
+      table = newTable;
+    }
+
+    if (!Array.isArray(table) || table.length === 0) table = [[""]];
+
+    return (
+      <div style={{ marginBottom: '1.5rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px' }}>
+        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</label>
+        <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {table.map((row, rIdx) => (
+                <tr key={rIdx}>
+                  {Array.isArray(row) && row.map((cell, cIdx) => (
+                    <td key={cIdx} style={{ border: '1px solid #ccc', padding: 0 }}>
+                      <input 
+                        value={cell} 
+                        onChange={(e) => {
+                          const newTable = [...table];
+                          newTable[rIdx] = [...newTable[rIdx]];
+                          newTable[rIdx][cIdx] = e.target.value;
+                          setData({ ...data, [key]: JSON.stringify(newTable) });
+                        }}
+                        style={{ width: '100%', border: 'none', padding: '8px', boxSizing: 'border-box' }}
+                      />
+                    </td>
+                  ))}
+                  <td>
+                    <button type="button" onClick={() => {
+                       const newTable = table.filter((_, i) => i !== rIdx);
+                       setData({ ...data, [key]: JSON.stringify(newTable) });
+                    }} style={{ color: 'red', border: 'none', background: 'transparent', cursor: 'pointer' }}><X size={16}/></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button type="button" onClick={() => {
+            const newTable = [...table, Array(table[0]?.length || 1).fill("")];
+            setData({ ...data, [key]: JSON.stringify(newTable) });
+          }} className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>+ Row</button>
+          <button type="button" onClick={() => {
+            const newTable = table.map(r => [...(Array.isArray(r) ? r : []), ""]);
+            setData({ ...data, [key]: JSON.stringify(newTable) });
+          }} className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>+ Col</button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderArrayEditor = (key: string) => {
+    let arr: string[] = [];
+    try { arr = JSON.parse(data[key] || "[]"); } catch(e) {}
+    if (!Array.isArray(arr)) arr = [];
+
+    return (
+      <div style={{ marginBottom: '1.5rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px' }}>
+        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</label>
+        {arr.map((val, idx) => (
+          <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <input value={val} onChange={(e) => {
+              const newArr = [...arr];
+              newArr[idx] = e.target.value;
+              setData({ ...data, [key]: JSON.stringify(newArr) });
+            }} style={{ flex: 1, padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+            <button type="button" onClick={() => {
+              const newArr = arr.filter((_, i) => i !== idx);
+              setData({ ...data, [key]: JSON.stringify(newArr) });
+            }} style={{ color: 'red', border: 'none', background: 'transparent', cursor: 'pointer' }}><X size={16}/></button>
+          </div>
+        ))}
+        <button type="button" onClick={() => {
+          setData({ ...data, [key]: JSON.stringify([...arr, ""]) });
+        }} className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>+ Add Item</button>
+      </div>
+    );
+  };
+
+  const renderImageEditor = (key: string) => {
+    const val = data[key];
+    return (
+      <div style={{ marginBottom: '1.5rem', background: '#f8f9fa', padding: '1rem', borderRadius: '8px' }}>
+        <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</label>
+        {val && (
+          <div style={{ marginBottom: '0.5rem', maxWidth: '200px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #ccc' }}>
+            <img src={val} alt="Preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <input type="text" value={val || ""} onChange={e => handleTextChange(key, e.target.value)} style={{ flex: 1, padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} placeholder="Image URL" />
+          <input type="file" accept="image/*" id={`file-${key}`} style={{ display: 'none' }} onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            setUploading(key);
+            const url = await uploadImage(f);
+            if (url) setData({ ...data, [key]: url });
+            setUploading(null);
+          }} />
+          <button type="button" onClick={() => document.getElementById(`file-${key}`)?.click()} className="btn" style={{ padding: '0.5rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <ImageIcon size={16} /> {uploading === key ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+      <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', color: '#333' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Live Edit Slide Data</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}><X size={24} color="#333" /></button>
+        </div>
+        <p style={{ marginBottom: '1.5rem', color: '#666', fontSize: '0.9rem' }}>Changes will reflect instantly and will be included in the exported PowerPoint.</p>
+        
+        <form onSubmit={(e) => { e.preventDefault(); onSave(data); }}>
+          {Object.keys(data).map(key => {
+            if (skipFields.includes(key)) return null;
+            if (typeof data[key] !== 'string') return null;
+
+            if (tableFields.includes(key)) return <React.Fragment key={key}>{renderTableEditor(key)}</React.Fragment>;
+            if (imageFields.includes(key)) return <React.Fragment key={key}>{renderImageEditor(key)}</React.Fragment>;
+            if (arrayFields.includes(key)) return <React.Fragment key={key}>{renderArrayEditor(key)}</React.Fragment>;
+
+            return (
+              <div key={key} style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1')}</label>
+                <textarea value={data[key]} onChange={(e) => handleTextChange(key, e.target.value)} style={{ width: '100%', minHeight: '60px', padding: '0.8rem', border: '1px solid #ccc', borderRadius: '4px', fontFamily: 'sans-serif', fontSize: '0.9rem' }} />
+              </div>
+            );
+          })}
+          
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem' }}>
+            <button type="button" onClick={onClose} className="btn">Cancel</button>
+            <button type="submit" className="btn btn-primary" style={{ backgroundColor: '#2C3E50', color: 'white' }}>Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function WorkshopMode() {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -15,6 +193,7 @@ export default function WorkshopMode() {
   const [templateStyle, setTemplateStyle] = useState<string>('corporate');
   const [isSlideQrEnlarged, setIsSlideQrEnlarged] = useState(false);
   const [activeCycleRemarks, setActiveCycleRemarks] = useState({ bpRemarks: "-", rpRemarks: "-" });
+  const [editingSlide, setEditingSlide] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,7 +313,11 @@ export default function WorkshopMode() {
       const response = await fetch('/api/workshop/generate-ppt', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template: templateStyle })
+        body: JSON.stringify({ 
+          template: templateStyle,
+          submissions: submissions,
+          allSubmissions: allSubmissions 
+        })
       });
       if (!response.ok) throw new Error('Failed to generate PPT');
       const data = await response.json();
@@ -306,6 +489,37 @@ export default function WorkshopMode() {
             </div>
             <h2 style={{ color: 'white', marginTop: '2rem', fontSize: '2rem' }}>Scan to Suggest</h2>
           </div>
+        )}
+        
+        {/* Live Edit Button for Submissions */}
+        {['BestPractice', 'RepetitiveProblem', 'SupportingSlide'].includes(currentSlide.type) && (
+          <button
+             onClick={(e) => { e.stopPropagation(); setEditingSlide(currentSlide); }}
+             style={{
+               position: 'absolute',
+               bottom: '1rem',
+               left: '1rem',
+               zIndex: 10,
+               background: 'rgba(255,255,255,0.7)',
+               color: '#333',
+               border: '1px solid rgba(0,0,0,0.1)',
+               padding: '0.4rem 0.6rem',
+               borderRadius: '6px',
+               cursor: 'pointer',
+               boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+               fontWeight: 'bold',
+               fontSize: '0.75rem',
+               display: 'flex',
+               alignItems: 'center',
+               gap: '0.3rem',
+               opacity: 0.5,
+               transition: 'opacity 0.2s ease'
+             }}
+             onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+             onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+          >
+             ✏️ Edit
+          </button>
         )}
       </div>
     );
@@ -923,6 +1137,20 @@ export default function WorkshopMode() {
           <button className="btn" onClick={nextSlide} disabled={currentSlideIndex === slides.length - 1}>Next &rarr;</button>
         </div>
       </div>
+
+      {editingSlide && (
+        <LiveEditModal 
+          slide={editingSlide} 
+          onClose={() => setEditingSlide(null)}
+          onSave={(updated) => {
+            const newSubmissions = submissions.map(s => s.id === updated.id ? updated : s);
+            setSubmissions(newSubmissions);
+            const newAllSubmissions = allSubmissions.map(s => s.id === updated.id ? updated : s);
+            setAllSubmissions(newAllSubmissions);
+            setEditingSlide(null);
+          }}
+        />
+      )}
     </div>
   );
 }

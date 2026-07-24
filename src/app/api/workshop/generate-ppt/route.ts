@@ -107,47 +107,59 @@ export async function POST(req: Request) {
     }
 
     // FETCH REAL DATA
-    let allSubmissions = await prisma.submission.findMany({
-      where: { status: { in: ["Submitted", "Accepted"] } },
-      include: { 
-        department: true, 
-        suggestions: { include: { assignedTeam: true } },
-        adoptions: { include: { user: { include: { department: true } } } }
-      }
-    });
-
     const activeCycle = await prisma.cycle.findFirst({
       where: { isActive: true }
     });
     const bpRemarks = activeCycle?.bpRemarks || "-";
     const rpRemarks = activeCycle?.rpRemarks || "-";
 
-    let dbSubmissions = allSubmissions.filter((s: any) => s.status === "Accepted");
+    let dbSubmissions = body.submissions;
+    let bps = [];
+    let rps = [];
+    let ss = [];
+    let allSubmissions = body.allSubmissions || [];
 
-    const bps = dbSubmissions.filter((s: any) => s.type === "BestPractice");
-    const rps = dbSubmissions.filter((s: any) => s.type === "RepetitiveProblem");
-    const ss = dbSubmissions.filter((s: any) => s.type === "SupportingSlide");
-    
-    const ordered: any[] = [];
-    const getSupporting = (t: string) => ss.find((s: any) => s.title === `Supporting Doc: ${t}`);
-    
-    bps.forEach((bp: any) => {
-      ordered.push(bp);
-      const child = getSupporting(bp.title);
-      if (child) ordered.push(child);
-    });
-    
-    rps.forEach((rp: any) => {
-      ordered.push(rp);
-      const child = getSupporting(rp.title);
-      if (child) ordered.push(child);
-    });
-    
-    const usedIds = new Set(ordered.map(s => s.id));
-    dbSubmissions.forEach((s: any) => {
-      if (!usedIds.has(s.id)) ordered.push(s);
-    });
-    dbSubmissions = ordered;
+    if (!dbSubmissions) {
+      // Fallback to database if frontend doesn't provide edited data
+      allSubmissions = await prisma.submission.findMany({
+        where: { status: { in: ["Submitted", "Accepted"] } },
+        include: { 
+          department: true, 
+          suggestions: { include: { assignedTeam: true } },
+          adoptions: { include: { user: { include: { department: true } } } }
+        }
+      });
+
+      dbSubmissions = allSubmissions.filter((s: any) => s.status === "Accepted");
+
+      bps = dbSubmissions.filter((s: any) => s.type === "BestPractice");
+      rps = dbSubmissions.filter((s: any) => s.type === "RepetitiveProblem");
+      ss = dbSubmissions.filter((s: any) => s.type === "SupportingSlide");
+      
+      const ordered: any[] = [];
+      const getSupporting = (t: string) => ss.find((s: any) => s.title === `Supporting Doc: ${t}`);
+      
+      bps.forEach((bp: any) => {
+        ordered.push(bp);
+        const child = getSupporting(bp.title);
+        if (child) ordered.push(child);
+      });
+      
+      rps.forEach((rp: any) => {
+        ordered.push(rp);
+        const child = getSupporting(rp.title);
+        if (child) ordered.push(child);
+      });
+      
+      const usedIds = new Set(ordered.map(s => s.id));
+      dbSubmissions.forEach((s: any) => {
+        if (!usedIds.has(s.id)) ordered.push(s);
+      });
+      dbSubmissions = ordered;
+    } else {
+      bps = dbSubmissions.filter((s: any) => s.type === "BestPractice");
+      rps = dbSubmissions.filter((s: any) => s.type === "RepetitiveProblem");
+    }
 
     // Calculate total slides to link the QR code to the final slide
     

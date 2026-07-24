@@ -399,13 +399,13 @@ function SubmitPageContent() {
           <form onSubmit={(e) => handleSubmit(e, "Submitted")} className="submit-form glass">
 
         <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-          <label>Submission Title</label>
+          <label>Submission Title <span style={{color: 'red'}}>*</span></label>
           <input type="text" className="input-field" placeholder="e.g., Blade Thickness Optimization" value={title} onChange={(e)=>setTitle(e.target.value)} required />
         </div>
 
         {!editId && cycles.length > 0 && (
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="section-label">Select Cycle</label>
+            <label className="section-label">Select Cycle <span style={{color: 'red'}}>*</span></label>
             <select className="input-field" value={selectedCycleId} onChange={(e)=>setSelectedCycleId(e.target.value)} required>
               {cycles.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -417,23 +417,23 @@ function SubmitPageContent() {
         {activeTab === "best-practice" ? (
           <>
             <div className="form-group">
-              <label>Objective / Purpose</label>
+              <label>Objective / Purpose <span style={{color: 'red'}}>*</span></label>
               <textarea className="input-field" rows={2} value={objective} onChange={(e)=>setObjective(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Problem Addressed</label>
+              <label>Problem Addressed <span style={{color: 'red'}}>*</span></label>
               <textarea className="input-field" rows={2} value={problemAddressed} onChange={(e)=>setProblemAddressed(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Methodology / Innovation</label>
+              <label>Methodology / Innovation <span style={{color: 'red'}}>*</span></label>
               <textarea className="input-field" rows={3} value={methodology} onChange={(e)=>setMethodology(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Impact / Savings (Rs. Lakhs)</label>
+              <label>Impact / Savings (Rs. Lakhs) <span style={{color: 'red'}}>*</span></label>
               <input type="number" className="input-field" value={impactSavings} onChange={(e)=>setImpactSavings(e.target.value)} required />
             </div>
             
-            <label className="section-label">Calculation Table (Metrics)</label>
+            <label className="section-label">Calculation Table (Metrics) <span style={{color: 'red'}}>*</span></label>
             <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
                 <tbody>
@@ -452,6 +452,7 @@ function SubmitPageContent() {
                               setCalculationTable(newTable);
                             }} 
                             style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                            required
                           />
                           {rIdx === 0 && calculationTable[0].length > 1 && (
                             <button 
@@ -509,15 +510,15 @@ function SubmitPageContent() {
         ) : activeTab === "problem" ? (
           <>
             <div className="form-group">
-              <label>Equipment Details</label>
+              <label>Equipment Details <span style={{color: 'red'}}>*</span></label>
               <input type="text" className="input-field" value={equipmentDetails} onChange={(e)=>setEquipmentDetails(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Problem Statement</label>
+              <label>Problem Statement <span style={{color: 'red'}}>*</span></label>
               <textarea className="input-field" rows={3} value={problemStatement} onChange={(e)=>setProblemStatement(e.target.value)} required />
             </div>
 
-            <label className="section-label">Impact Calculation</label>
+            <label className="section-label">Impact Calculation <span style={{color: 'red'}}>*</span></label>
             <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
                 <tbody>
@@ -536,6 +537,7 @@ function SubmitPageContent() {
                               setImpactCalculation(newTable);
                             }}
                             style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                            required
                           />
                           {rIdx === 0 && impactCalculation[0].length > 1 && (
                             <button
@@ -574,10 +576,10 @@ function SubmitPageContent() {
               </div>
             </div>
             
-            <label className="section-label">Why-Why Analysis</label>
+            <label className="section-label">Why-Why Analysis <span style={{color: 'red'}}>*</span></label>
             {whyWhyAnalysis.map((why, idx) => (
               <div className="form-group" key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <input type="text" className="input-field" style={{ flex: 1 }} placeholder={`Why ${idx + 1}?`} value={why} onChange={(e) => handleWhyChange(idx, e.target.value)} />
+                <input type="text" className="input-field" style={{ flex: 1 }} placeholder={`Why ${idx + 1}?`} value={why} onChange={(e) => handleWhyChange(idx, e.target.value)} required />
                 {idx > 0 && <button type="button" className="btn" style={{ padding: '0.2rem 0.5rem', background: '#ffebee', color: '#d32f2f' }} onClick={() => setWhyWhyAnalysis(whyWhyAnalysis.filter((_, i) => i !== idx))}>X</button>}
               </div>
             ))}
@@ -585,7 +587,7 @@ function SubmitPageContent() {
               <button type="button" className="btn" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginBottom: '1rem' }} onClick={() => setWhyWhyAnalysis([...whyWhyAnalysis, ""])}>+ Add Why</button>
             )}
 
-            <label className="section-label">Action Taken Table</label>
+            <label className="section-label">Action Taken Table <span style={{color: 'red'}}>*</span></label>
             <div style={{ overflowX: 'auto', background: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--glass-border)', marginBottom: '1rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
                 <tbody>
@@ -604,6 +606,7 @@ function SubmitPageContent() {
                               setActionTakenTable(newTable);
                             }}
                             style={{ width: '100%', border: 'none', background: 'transparent', borderRadius: '0' }}
+                            required
                           />
                           {rIdx === 0 && actionTakenTable[0].length > 1 && (
                             <button
@@ -725,7 +728,12 @@ function SubmitPageContent() {
         )}
         <div className="form-actions" style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
           {(activeTab === "best-practice" || activeTab === "problem") && !editId ? (
-            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
+            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={(e) => {
+              const form = e.currentTarget.closest('form');
+              if (form && !form.checkValidity()) {
+                form.reportValidity();
+                return;
+              }
               setPendingSubmissionType(activeTab === "best-practice" ? "BestPractice" : "RepetitiveProblem");
               setSupportingSlideType(activeTab === "best-practice" ? "BestPractice" : "RepetitiveProblem");
               setActiveTab("supporting-slide");
