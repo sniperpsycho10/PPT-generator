@@ -65,7 +65,8 @@ export async function GET(req: Request) {
     // Fetch top 10 notifications for the user (both read and unread)
     const notifications = await prisma.notification.findMany({
       where: {
-        userId: userId
+        userId: userId,
+        isDeleted: false
       },
       orderBy: {
         createdAt: 'desc'
@@ -92,18 +93,24 @@ export async function DELETE(req: Request) {
     const notificationId = url.searchParams.get("id");
 
     if (notificationId) {
-      // Delete a specific notification
-      await prisma.notification.deleteMany({
+      // Soft-delete a specific notification
+      await prisma.notification.updateMany({
         where: {
           id: notificationId,
           userId: userId
+        },
+        data: {
+          isDeleted: true
         }
       });
     } else {
-      // Delete all notifications for this user
-      await prisma.notification.deleteMany({
+      // Soft-delete all notifications for this user
+      await prisma.notification.updateMany({
         where: {
           userId: userId
+        },
+        data: {
+          isDeleted: true
         }
       });
     }
