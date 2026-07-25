@@ -166,7 +166,7 @@ export async function POST(req: Request) {
     // Generate local Base64 QR code for bulletproof offline rendering
     const qrDataUrl = await QRCode.toDataURL(`${origin}/feedback`, { width: 300, margin: 1 });
 
-        pptx.defineSlideMaster({
+    pptx.defineSlideMaster({
       title: "PREMIUM_MASTER",
       background: { fill: bg },
       objects: masterObjects,

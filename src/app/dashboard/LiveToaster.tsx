@@ -50,8 +50,12 @@ export default function LiveToaster({ isAdmin }: { isAdmin: boolean }) {
             }
           }
         }
-      } catch (err) {
-        console.error("Live Toaster polling error:", err);
+      } catch (err: any) {
+        // Suppress generic fetch errors (like network drop or dev server restart)
+        // to avoid triggering Next.js error overlays for transient polling issues.
+        if (err.message !== 'Failed to fetch') {
+          console.warn("Live Toaster polling error:", err);
+        }
       }
     }, 10000); // Check every 10 seconds
 
