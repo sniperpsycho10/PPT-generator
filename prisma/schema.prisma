@@ -7,42 +7,104 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  Pending
+  User
+  Admin
+  SuperAdmin
+  Rejected
+}
+
+enum SubmissionType {
+  BestPractice
+  RepetitiveProblem
+  SupportingSlide
+}
+
+enum SubmissionStatus {
+  Draft
+  Submitted
+  Reviewed
+  Accepted
+}
+
+enum SuggestionStatus {
+  Pending
+  Accepted
+  Rejected
+  Review
+  NeedMoreInfo
+}
+
+enum ImplementationStage {
+  PendingReview
+  FeasibilityAnalysis
+  Procurement
+  ExecutionShutdown
+  ExecutionRunning
+  Testing
+  Standardized
+  Closed
+}
+
+enum SafetyImpact {
+  High
+  Medium
+  Low
+  None
+}
+
+enum ActionItemStatus {
+  Open
+  InProgress
+  Closed
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
 model User {
-  id            String       @id @default(uuid())
+  id            String         @id @default(uuid())
   name          String?
-  email         String?      @unique
+  email         String?        @unique
   emailVerified DateTime?
   image         String?
   passwordHash  String?
-  role          String       @default("Pending") // "Pending", "User", "Admin", "Super Admin", "Rejected"
+  role          UserRole       @default(Pending)
   departmentId  String?
-  department    Department?  @relation(fields: [departmentId], references: [id])
+  department    Department?    @relation(fields: [departmentId], references: [id])
   submissions   Submission[]
   suggestions   Suggestion[]
   actionItems   ActionItem[]
   accounts      Account[]
   sessions      Session[]
-  teams         Team[]       @relation("TeamMembers")
+  teams         Team[]         @relation("TeamMembers")
   notifications Notification[]
   adoptions     Adoption[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  auditLogs     AuditLog[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
-  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
 }
 
@@ -58,63 +120,71 @@ model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
+
   @@unique([identifier, token])
 }
 
 model Department {
-  id           String       @id @default(uuid())
-  name         String
-  qrCodeHash   String       @unique
-  users        User[]
-  submissions  Submission[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id          String       @id @default(uuid())
+  name        String
+  qrCodeHash  String       @unique
+  users       User[]
+  submissions Submission[]
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
 }
 
 model Submission {
-  id                String       @id @default(uuid())
-  departmentId      String
-  department        Department   @relation(fields: [departmentId], references: [id])
-  userId            String
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type              String       // "BestPractice", "RepetitiveProblem", "SupportingSlide"
-  title             String
-  description       String
-  
+  id           String         @id @default(uuid())
+  departmentId String
+  department   Department     @relation(fields: [departmentId], references: [id])
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         SubmissionType
+  title        String
+  description  String
+
   // Best Practice Specific Fields
-  objective         String?
-  problemAddressed  String?
-  methodology       String?
-  impactSavings     Float?       // Savings amount
-  downtime          Float?       // Hours of downtime saved
-  calculationTable  String?      // Stored as JSON string [{metric, before, after, gain}]
-  
+  objective        String?
+  problemAddressed String?
+  methodology      String?
+  impactSavings    Float?
+  downtime         Float?
+  calculationTable Json?
+
   // Repetitive Problem Specific Fields
   equipmentDetails  String?
   problemStatement  String?
-  impactCalculation String?      // Stored as JSON string [{parameter, value, calculation}]
-  whyWhyAnalysis    String?      // Stored as JSON string [why1, why2, why3, why4, why5]
-  actionTakenTable  String?      // Stored as JSON string [{action, target, status}]
-  
-  beforeImageUrl    String?
-  afterImageUrl     String?
-  attachmentUrl     String?
-  
+  impactCalculation Json?
+  whyWhyAnalysis    Json?
+  actionTakenTable  Json?
+
+  beforeImageUrl String?
+  afterImageUrl  String?
+  attachmentUrl  String?
+
   // Supporting Slide Specific Fields
-  supportingSlideType String?      // "BestPractice" or "RepetitiveProblem"
-  customTable         String?      // Stored as JSON string (e.g. string[][])
-  supportingImages    String[]     // Array of image URLs (up to 3)
+  supportingSlideType SubmissionType?
+  customTable         Json?
+  supportingImages    String[]
 
   // Cycle Linking
-  cycleId           String?
-  cycle             Cycle?       @relation(fields: [cycleId], references: [id])
+  cycleId String?
+  cycle   Cycle?  @relation(fields: [cycleId], references: [id])
 
-  status            String       // "Draft", "Submitted", "Reviewed", "Accepted"
-  submissionMonth   DateTime     @default(now())
-  suggestions       Suggestion[]
-  adoptions         Adoption[]
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  status          SubmissionStatus
+  submissionMonth DateTime         @default(now())
+  suggestions     Suggestion[]
+  adoptions       Adoption[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@index([departmentId])
+  @@index([userId])
+  @@index([cycleId])
 }
 
 model Cycle {
@@ -127,52 +197,61 @@ model Cycle {
   isActive    Boolean      @default(true)
   bpRemarks   String?
   rpRemarks   String?
+  createdById String?
   submissions Submission[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
 }
 
 model Suggestion {
-  id             String       @id @default(uuid())
+  id             String           @id @default(uuid())
   submissionId   String?
-  submission     Submission?  @relation(fields: [submissionId], references: [id])
+  submission     Submission?      @relation(fields: [submissionId], references: [id])
   suggestedById  String?
-  suggestedBy    User?        @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
+  suggestedBy    User?            @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
   guestName      String?
   guestDept      String?
   suggestionText String
-  status         String       // "Pending", "Accepted", "Rejected", "Review", "NeedMoreInfo"
-  
+  status         SuggestionStatus
+
   // Tracking Fields for Steel Plant Execution
-  implementationStage  String?  @default("Pending Review") // "Pending Review", "Feasibility Analysis", "Procurement/Spares", "Execution (Shutdown Required)", "Execution (Running)", "Testing", "Standardized", "Closed"
-  safetyImpact         String?  // "High", "Medium", "Low", "None"
-  costImplication      Float?   // Estimated cost
-  executingDepartment  String?  // Dept responsible for execution
+  implementationStage  ImplementationStage? @default(PendingReview)
+  safetyImpact         SafetyImpact?
+  costImplication      Float?
+  executingDepartment  String?
   assignedTeamId       String?
-  assignedTeam         Team?    @relation("TeamSuggestions", fields: [assignedTeamId], references: [id])
-  currentProgress      Int      @default(0)
+  assignedTeam         Team?                @relation("TeamSuggestions", fields: [assignedTeamId], references: [id])
+  currentProgress      Int                  @default(0)
   targetCompletionDate DateTime?
   actualCompletionDate DateTime?
-  trackingRemarks      String?  // Notes on blockers/progress
+  trackingRemarks      String?
 
-  actionItems    ActionItem[]
-  progressLog    SuggestionProgress[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  actionItems ActionItem[]
+  progressLog SuggestionProgress[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+
+  @@index([submissionId])
+  @@index([suggestedById])
 }
 
 model ActionItem {
-  id           String     @id @default(uuid())
+  id           String           @id @default(uuid())
   suggestionId String
-  suggestion   Suggestion @relation(fields: [suggestionId], references: [id])
+  suggestion   Suggestion       @relation(fields: [suggestionId], references: [id])
   assignedToId String
-  assignedTo   User       @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
+  assignedTo   User             @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
   dueDate      DateTime
-  status       String     // "Open", "InProgress", "Closed"
+  status       ActionItemStatus
   evidenceUrl  String?
   remarks      String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+
+  @@index([suggestionId, assignedToId])
 }
 
 model Team {
@@ -185,16 +264,16 @@ model Team {
 }
 
 model SuggestionProgress {
-  id           String     @id @default(uuid())
-  suggestionId String
-  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
-  progress     Int
-  notes        String?
-  photoUrls    String[]
-  attachedFileUrl String?
+  id               String     @id @default(uuid())
+  suggestionId     String
+  suggestion       Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  progress         Int
+  notes            String?
+  photoUrls        String[]
+  attachedFileUrl  String?
   attachedFileName String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 model Notification {
@@ -217,4 +296,18 @@ model Adoption {
   userId       String
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
+}
+
+model AuditLog {
+  id            String      @id @default(uuid())
+  entityId      String
+  entityType    String
+  action        AuditAction
+  changedFields Json?
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([entityId, entityType])
+  @@index([userId])
 }

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userRole = (session.user as any).role;
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
     const { name, month, year, startDate, endDate, isActive, bpRemarks, rpRemarks } = data;

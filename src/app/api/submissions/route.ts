@@ -53,22 +53,32 @@ export async function POST(req: Request) {
         problemAddressed: data.problemAddressed,
         methodology: data.methodology,
         impactSavings: data.impactSavings ? parseFloat(data.impactSavings) : null,
-        calculationTable: data.calculationTable,
+        calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
         
         // Problem
         equipmentDetails: data.equipmentDetails,
         problemStatement: data.problemStatement,
-        impactCalculation: data.impactCalculation,
-        whyWhyAnalysis: data.whyWhyAnalysis,
-        actionTakenTable: data.actionTakenTable,
+        impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
+        whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
+        actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
 
         // Supporting Slide
         supportingSlideType: data.supportingSlideType,
-        customTable: data.customTable,
+        customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
         supportingImages: data.supportingImages || [],
         
         // Cycle Mapping
         cycleId: data.cycleId || null,
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entityId: submission.id,
+        entityType: 'Submission',
+        action: 'CREATE',
+        userId: user.id,
+        changedFields: submission as any
       }
     });
 
@@ -86,8 +96,8 @@ export async function GET() {
     const userId = (session.user as any).id;
     const userRole = (session.user as any).role;
 
-    let whereClause: any = { status: { in: ["Submitted", "Accepted"] } };
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    let whereClause: any = { status: { in: ["Submitted", "Accepted"] }, deletedAt: null };
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       whereClause.userId = userId;
     }
 

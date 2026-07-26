@@ -68,7 +68,7 @@ export default function SettingsPage() {
   };
 
   const getRoleBadge = (role: string) => {
-    if (role === 'Super Admin') return { bg: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', icon: <ShieldAlert size={14} /> };
+    if (role === 'SuperAdmin') return { bg: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', icon: <ShieldAlert size={14} /> };
     if (role === 'Admin') return { bg: 'rgba(52, 152, 219, 0.1)', color: '#3498db', icon: <Shield size={14} /> };
     if (role === 'Pending') return { bg: 'rgba(241, 196, 15, 0.1)', color: '#f39c12', icon: <Clock size={14} /> };
     if (role === 'Rejected') return { bg: 'rgba(149, 165, 166, 0.1)', color: '#7f8c8d', icon: <XCircle size={14} /> };
@@ -159,13 +159,13 @@ export default function SettingsPage() {
                               </button>
                             </>
                           )}
-                          {user.role !== 'Pending' && user.role !== 'Super Admin' && currentUserRole === 'Super Admin' && (
+                          {user.role !== 'Pending' && user.role !== 'SuperAdmin' && currentUserRole === 'SuperAdmin' && (
                             <button onClick={() => updateUserRole(user.id, user.role === 'User' ? 'Admin' : 'User')} className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#f0f4f8', color: '#333' }}>
                               {user.role === 'User' ? 'Make Admin' : 'Make User'}
                             </button>
                           )}
                           
-                          {user.role !== 'Super Admin' && (currentUserRole === 'Super Admin' || (currentUserRole === 'Admin' && user.role !== 'Admin')) && (
+                          {user.role !== 'SuperAdmin' && (currentUserRole === 'SuperAdmin' || (currentUserRole === 'Admin' && user.role !== 'Admin')) && (
                             <button onClick={() => deleteUser(user.id)} className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: 'transparent', color: '#d32f2f', border: '1px solid #d32f2f' }}>
                               <Trash2 size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} /> Delete
                             </button>

@@ -114,9 +114,9 @@ export async function POST(req: Request) {
     const rpRemarks = activeCycle?.rpRemarks || "-";
 
     let dbSubmissions = body.submissions;
-    let bps = [];
-    let rps = [];
-    let ss = [];
+    let bps: any[] = [];
+    let rps: any[] = [];
+    let ss: any[] = [];
     let allSubmissions = body.allSubmissions || [];
 
     if (!dbSubmissions) {

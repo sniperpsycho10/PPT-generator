@@ -12,7 +12,7 @@ export default async function SuggestionsPage() {
   }
 
   const userRole = (session.user as any).role;
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
   return <SuggestionsClient isAdmin={isAdmin} />;
 }

@@ -10,9 +10,9 @@ export default async function DashboardOverview() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   const userRole = (session?.user as any)?.role;
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
-  const whereClause = isAdmin ? {} : { userId };
+  const whereClause: any = isAdmin ? { deletedAt: null } : { userId, deletedAt: null };
 
   const submissions = await prisma.submission.findMany({
     where: whereClause,
@@ -34,6 +34,7 @@ export default async function DashboardOverview() {
   const actionItemsCount = await prisma.actionItem.count({
     where: {
       status: { in: ['Open', 'InProgress'] },
+      deletedAt: null,
       ...(isAdmin ? {} : { assignedToId: userId })
     }
   });

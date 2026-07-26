@@ -11,7 +11,7 @@ async function checkAdmin() {
   const userId = (session.user as any).id;
   const dbUser = await prisma.user.findUnique({ where: { id: userId } });
   
-  if (!dbUser || (dbUser.role !== 'Admin' && dbUser.role !== 'Super Admin')) {
+  if (!dbUser || (dbUser.role !== 'Admin' && dbUser.role !== 'SuperAdmin')) {
     return false;
   }
   return true;

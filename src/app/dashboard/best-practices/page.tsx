@@ -10,12 +10,13 @@ export default async function BestPracticesPage() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   const userRole = (session?.user as any)?.role;
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
   const bestPractices = await prisma.submission.findMany({
     where: {
       type: "BestPractice",
-      status: "Accepted"
+      status: "Accepted",
+      deletedAt: null
     },
     include: {
       department: true,

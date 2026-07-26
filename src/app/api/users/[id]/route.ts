@@ -7,7 +7,7 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
   try {
     const session = await getServerSession(authOptions);
     const userRole = (session?.user as any)?.role;
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
     }
 
@@ -15,10 +15,10 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
     const params = await props.params;
     const targetUserId = params.id;
     
-    // Super Admin protection
+    // SuperAdmin protection
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
-    if (targetUser?.role === 'Super Admin' && userRole !== 'Super Admin') {
-      return NextResponse.json({ success: false, error: "Only Super Admins can modify Super Admins" }, { status: 403 });
+    if (targetUser?.role === 'SuperAdmin' && userRole !== 'SuperAdmin') {
+      return NextResponse.json({ success: false, error: "Only SuperAdmins can modify SuperAdmins" }, { status: 403 });
     }
 
     const dataToUpdate: any = {};
@@ -32,6 +32,18 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
       data: dataToUpdate
     });
     
+    if (role !== undefined) {
+      await prisma.auditLog.create({
+        data: {
+          entityId: targetUserId,
+          entityType: 'User',
+          action: 'UPDATE',
+          userId: (session?.user as any)?.id,
+          changedFields: { newRole: role }
+        }
+      });
+    }
+    
     return NextResponse.json({ success: true, data: updatedUser });
   } catch (err) {
     console.error(err);
@@ -43,29 +55,40 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
   try {
     const session = await getServerSession(authOptions);
     const userRole = (session?.user as any)?.role;
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
     }
 
     const params = await props.params;
     const targetUserId = params.id;
 
-    // Super Admin protection
+    // SuperAdmin protection
     const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
     if (!targetUser) {
       return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
 
-    if (targetUser.role === 'Super Admin') {
-      return NextResponse.json({ success: false, error: "Super Admins cannot be deleted" }, { status: 403 });
+    if (targetUser.role === 'SuperAdmin') {
+      return NextResponse.json({ success: false, error: "SuperAdmins cannot be deleted" }, { status: 403 });
     }
 
-    if (targetUser.role === 'Admin' && userRole !== 'Super Admin') {
-      return NextResponse.json({ success: false, error: "Only Super Admins can delete Admins" }, { status: 403 });
+    if (targetUser.role === 'Admin' && userRole !== 'SuperAdmin') {
+      return NextResponse.json({ success: false, error: "Only SuperAdmins can delete Admins" }, { status: 403 });
     }
 
-    await prisma.user.delete({
-      where: { id: targetUserId }
+    const deletedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: { deletedAt: new Date() }
+    });
+    
+    await prisma.auditLog.create({
+      data: {
+        entityId: targetUserId,
+        entityType: 'User',
+        action: 'DELETE',
+        userId: (session?.user as any)?.id,
+        changedFields: { email: deletedUser.email }
+      }
     });
     
     return NextResponse.json({ success: true });

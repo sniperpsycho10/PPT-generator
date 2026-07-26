@@ -12,9 +12,9 @@ export default async function SubmissionsPage() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   const userRole = (session?.user as any)?.role;
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
-  const whereClause = isAdmin ? {} : { userId };
+  const whereClause: any = isAdmin ? { deletedAt: null } : { userId, deletedAt: null };
 
   const submissions = await prisma.submission.findMany({
     where: whereClause,

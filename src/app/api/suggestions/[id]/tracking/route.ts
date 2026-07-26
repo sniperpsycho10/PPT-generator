@@ -9,7 +9,7 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
     if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
-    const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+    const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
     const params = await props.params;
     const id = params.id;

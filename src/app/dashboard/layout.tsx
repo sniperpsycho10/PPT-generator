@@ -29,8 +29,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const userRole = dbUser.role;
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
-  const allDepartments = await prisma.department.findMany({ orderBy: { name: 'asc' } });
+  const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
+  const allDepartments = await prisma.department.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } });
 
   return (
     <div className="dashboard-container">

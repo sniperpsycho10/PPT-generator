@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     const userRole = dbUser?.role;
     
     // Security check: only allow Admins to poll recent suggestions
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

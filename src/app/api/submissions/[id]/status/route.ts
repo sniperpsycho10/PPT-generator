@@ -9,7 +9,7 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
     if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userRole = (session.user as any).role;
 
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

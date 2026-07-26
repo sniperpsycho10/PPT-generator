@@ -55,7 +55,7 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
     const params = await props.params;
     const id = params.id;
     
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       const sug = await prisma.suggestion.findUnique({ where: { id }, include: { submission: true } });
       if (sug?.suggestedById !== userId && sug?.submission?.userId !== userId) {
         return NextResponse.json({ error: "Unauthorized to delete" }, { status: 403 });

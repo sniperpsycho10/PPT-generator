@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     const userRole = (session?.user as any)?.role;
     
     // Security check: only allow Admins to view this
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
         }
       },
       orderBy: {
-        role: 'desc' // Super Admin first usually
+        role: 'desc' // SuperAdmin first usually
       }
     });
 

@@ -15,7 +15,7 @@ export default async function CyclesPage() {
     where: { id: (session.user as any).id }
   });
 
-  if (!user || (user.role !== 'Admin' && user.role !== 'Super Admin')) {
+  if (!user || (user.role !== 'Admin' && user.role !== 'SuperAdmin')) {
     redirect("/dashboard");
   }
 

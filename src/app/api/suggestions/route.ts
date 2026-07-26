@@ -73,9 +73,10 @@ export async function GET() {
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     const userRole = dbUser?.role;
 
-    let whereClause = {};
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    let whereClause: any = { deletedAt: null };
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       whereClause = {
+        deletedAt: null,
         OR: [
           { suggestedById: userId },
           { submission: { userId: userId } }

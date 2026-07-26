@@ -14,14 +14,23 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
     const id = params.id;
     if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       const sub = await prisma.submission.findUnique({ where: { id }});
       if (sub?.userId !== userId) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Delete child records first to satisfy foreign key constraints
-    await prisma.suggestion.deleteMany({ where: { submissionId: id } });
-    await prisma.submission.delete({ where: { id } });
+    // Soft delete child records first
+    await prisma.suggestion.updateMany({ where: { submissionId: id }, data: { deletedAt: new Date() } });
+    const deletedSub = await prisma.submission.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.auditLog.create({
+      data: {
+        entityId: id,
+        entityType: 'Submission',
+        action: 'DELETE',
+        userId: userId,
+        changedFields: deletedSub as any
+      }
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete Error:", error);
@@ -43,7 +52,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     const oldSub = await prisma.submission.findUnique({ where: { id } });
     if (!oldSub) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    if (userRole !== 'Admin' && userRole !== 'Super Admin') {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       if (oldSub.userId !== userId) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
       if (oldSub.status === 'Accepted' || oldSub.status === 'Rejected') {
         return NextResponse.json({ error: "Cannot edit an accepted or rejected submission" }, { status: 403 });
@@ -63,7 +72,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     }
 
     // Minimal edit logic
-    await prisma.submission.update({
+    const updatedSub = await prisma.submission.update({
       where: { id },
       data: {
         departmentId: department.id,
@@ -73,20 +82,30 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         objective: data.objective,
         problemAddressed: data.problemAddressed,
         methodology: data.methodology,
-        impactSavings: data.impactSavings,
+        impactSavings: data.impactSavings ? parseFloat(data.impactSavings) : null,
         equipmentDetails: data.equipmentDetails,
         problemStatement: data.problemStatement,
-        calculationTable: data.calculationTable,
-        impactCalculation: data.impactCalculation,
-        whyWhyAnalysis: data.whyWhyAnalysis,
-        actionTakenTable: data.actionTakenTable,
+        calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
+        impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
+        whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
+        actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
         beforeImageUrl: data.beforeImageUrl,
         afterImageUrl: data.afterImageUrl,
         attachmentUrl: data.attachmentUrl,
         supportingSlideType: data.supportingSlideType,
-        customTable: data.customTable,
+        customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
         supportingImages: data.supportingImages || [],
         cycleId: data.cycleId || null
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entityId: id,
+        entityType: 'Submission',
+        action: 'UPDATE',
+        userId: userId,
+        changedFields: updatedSub as any
       }
     });
 
@@ -114,7 +133,7 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
     });
     if (!submission) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    if (userRole !== 'Admin' && userRole !== 'Super Admin' && submission.userId !== userId) {
+    if (userRole !== 'Admin' && userRole !== 'SuperAdmin' && submission.userId !== userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

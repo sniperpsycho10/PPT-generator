@@ -15,9 +15,9 @@ export default async function TrackingPage() {
   
   const userRole = (session.user as any).role;
   const userId = (session.user as any).id;
-  const isAdmin = userRole === 'Admin' || userRole === 'Super Admin';
+  const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
-  let whereClause: any = { status: "Accepted" };
+  let whereClause: any = { status: "Accepted", deletedAt: null };
   if (!isAdmin) {
     whereClause.assignedTeam = {
       members: {
@@ -40,6 +40,7 @@ export default async function TrackingPage() {
   });
 
   const departments = await prisma.department.findMany({
+    where: { deletedAt: null },
     orderBy: { name: 'asc' }
   });
 
