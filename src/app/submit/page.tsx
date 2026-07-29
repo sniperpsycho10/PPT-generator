@@ -15,6 +15,7 @@ function SubmitPageContent() {
   const [activeTab, setActiveTab] = useState<"best-practice" | "problem" | "supporting-slide">("best-practice");
   const [pendingSubmissionType, setPendingSubmissionType] = useState<"BestPractice" | "RepetitiveProblem" | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
   const [fileImportTarget, setFileImportTarget] = useState<"calculation" | "impact" | "action" | "custom" | null>(null);
 
   const [title, setTitle] = useState("");
@@ -113,16 +114,53 @@ function SubmitPageContent() {
     setWhyWhyAnalysis(newWhys);
   };
 
-  const uploadImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      return data.success ? data.url : null;
-    } catch(e) {
-      return null;
-    }
+  const uploadImage = async (file: File, stepName: string) => {
+    setUploadStatus(`Uploading ${stepName}...`);
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload", true);
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const pct = Math.round((event.loaded / event.total) * 100);
+          setUploadStatus(`Uploading ${stepName}... ${pct}%`);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+              resolve(data.url);
+            } else {
+              alert("Upload failed: " + (data.error || "Unknown error"));
+              resolve(null);
+            }
+          } catch {
+            alert("Upload failed: Invalid response");
+            resolve(null);
+          }
+        } else {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            alert("Upload failed: " + (data.error || xhr.statusText));
+          } catch {
+            alert("Upload failed: " + xhr.statusText);
+          }
+          resolve(null);
+        }
+      };
+      
+      xhr.onerror = () => {
+        alert("Upload failed: Network error");
+        resolve(null);
+      };
+
+      const formData = new FormData();
+      formData.append("file", file);
+      xhr.send(formData);
+    });
   };
 
   const addCustomRow = () => {
@@ -261,9 +299,10 @@ function SubmitPageContent() {
           supportingSlideType: pendingSubmissionType, customTable: "[]", supportingImages: [],
           cycleId: selectedCycleId || null
         };
-        if (beforeImage) parentPayload.beforeImageUrl = await uploadImage(beforeImage) || "";
-        if (afterImage) parentPayload.afterImageUrl = await uploadImage(afterImage) || "";
-        if (supportingImage) parentPayload.attachmentUrl = await uploadImage(supportingImage) || "";
+        setUploadStatus("Uploading images...");
+        if (beforeImage) parentPayload.beforeImageUrl = await uploadImage(beforeImage, "Before Image") || "";
+        if (afterImage) parentPayload.afterImageUrl = await uploadImage(afterImage, "After Image") || "";
+        if (supportingImage) parentPayload.attachmentUrl = await uploadImage(supportingImage, "Supporting Attachment") || "";
         
         await submitSingle(parentPayload, submitStatus);
 
@@ -280,9 +319,10 @@ function SubmitPageContent() {
           cycleId: selectedCycleId || null
         };
         let i1 = ""; let i2 = ""; let i3 = "";
-        if (suppImg1) i1 = await uploadImage(suppImg1) || "";
-        if (suppImg2) i2 = await uploadImage(suppImg2) || "";
-        if (suppImg3) i3 = await uploadImage(suppImg3) || "";
+        setUploadStatus("Uploading supporting images...");
+        if (suppImg1) i1 = await uploadImage(suppImg1, "Picture 1") as string || "";
+        if (suppImg2) i2 = await uploadImage(suppImg2, "Picture 2") as string || "";
+        if (suppImg3) i3 = await uploadImage(suppImg3, "Picture 3") as string || "";
         ssPayload.supportingImages = [i1, i2, i3].filter(Boolean);
 
         await submitSingle(ssPayload, submitStatus);
@@ -301,15 +341,19 @@ function SubmitPageContent() {
 
         if (activeTab === "supporting-slide") {
           let i1 = ""; let i2 = ""; let i3 = "";
-          if (suppImg1) i1 = await uploadImage(suppImg1) || "";
-          if (suppImg2) i2 = await uploadImage(suppImg2) || "";
-          if (suppImg3) i3 = await uploadImage(suppImg3) || "";
+          setUploadStatus("Uploading supporting images...");
+          if (suppImg1) i1 = await uploadImage(suppImg1, "Picture 1") as string || "";
+          if (suppImg2) i2 = await uploadImage(suppImg2, "Picture 2") as string || "";
+          if (suppImg3) i3 = await uploadImage(suppImg3, "Picture 3") as string || "";
           payload.supportingImages = [i1, i2, i3].filter(Boolean);
         } else {
-          if (beforeImage) payload.beforeImageUrl = await uploadImage(beforeImage) || "";
-          if (afterImage) payload.afterImageUrl = await uploadImage(afterImage) || "";
-          if (supportingImage) payload.attachmentUrl = await uploadImage(supportingImage) || "";
+          setUploadStatus("Uploading images...");
+          if (beforeImage) payload.beforeImageUrl = await uploadImage(beforeImage, "Before Image") || "";
+          if (afterImage) payload.afterImageUrl = await uploadImage(afterImage, "After Image") || "";
+          if (supportingImage) payload.attachmentUrl = await uploadImage(supportingImage, "Supporting Attachment") || "";
         }
+        
+        setUploadStatus("Saving to database...");
         
         await submitSingle(payload, submitStatus);
       }
@@ -321,6 +365,7 @@ function SubmitPageContent() {
     }
     
     setLoading(false);
+    setUploadStatus("");
   };
 
   return (
@@ -747,7 +792,7 @@ function SubmitPageContent() {
               </button>
               
               <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={(e) => handleSubmit(e, "Submitted")} disabled={loading}>
-                {loading ? (editId ? "Updating..." : "Submitting...") : (editId ? "Update Submission" : "Final Submit")}
+                {loading ? (uploadStatus || (editId ? "Updating..." : "Submitting...")) : (editId ? "Update Submission" : "Final Submit")}
               </button>
             </>
           )}

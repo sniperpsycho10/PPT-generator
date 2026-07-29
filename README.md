@@ -51,11 +51,13 @@ NEXTAUTH_URL="http://localhost:4000"
 NEXTAUTH_SECRET="any_secure_random_string_here"
 ```
 
-### 4. Setup the Database Schema
-Sync the Prisma schema with your newly created PostgreSQL database:
+### 4. Setup the Database Schema & Seed Data
+Sync the Prisma schema with your newly created PostgreSQL database, and seed the default roles/departments:
 ```bash
 npx prisma db push
+npm run seed
 ```
+*(Note: Seeding creates default departments, an active cycle, and a SuperAdmin user: `admin@jspl.com` / `admin123`)*
 
 ### 5. Run the Application
 Start the Next.js development server. We use port `4000` to avoid conflicts with other apps:
@@ -63,7 +65,7 @@ Start the Next.js development server. We use port `4000` to avoid conflicts with
 npm run dev -- -p 4000
 ```
 
-### 6. Access the Dashboard
+### 7. Access the Dashboard
 - **Local Access**: Open [http://localhost:4000](http://localhost:4000) in your laptop's browser.
 - **Mobile/Network Access**: Look at your terminal output for the **Network** IP (e.g., `http://192.168.x.x:4000`). Make sure your phone is connected to the same Wi-Fi network and open that URL to test mobile features!
 
@@ -71,9 +73,9 @@ npm run dev -- -p 4000
 
 ## Architecture & Technologies
 
-- **Frontend**: Next.js 14 (App Router), React, standard CSS for premium glassy aesthetics.
+- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS.
 - **Backend**: Next.js API Routes, NextAuth for authentication.
-- **Database**: PostgreSQL orchestrated via Prisma ORM.
+- **Database**: PostgreSQL orchestrated via Prisma ORM (v5).
 - **PPT Generation**: `PptxGenJS`
 - **QR Codes**: `qrcode` & `qrcode.react` (Fully local, no external APIs used).
 

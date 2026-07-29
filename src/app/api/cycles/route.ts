@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authHelpers";
+import { CycleSchema } from "@/lib/validations";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const includeArchived = searchParams.get("includeArchived") === "true";
+
     const cycles = await prisma.cycle.findMany({
+      where: includeArchived ? {} : { isArchived: false },
       orderBy: { startDate: 'desc' }
     });
     return NextResponse.json({ success: true, data: cycles });
@@ -17,17 +21,17 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const userRole = (session.user as any).role;
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
 
     const data = await req.json();
-    const { name, month, year, startDate, endDate, isActive, bpRemarks, rpRemarks } = data;
-
-    if (!name || !startDate || !endDate) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const validatedData = CycleSchema.safeParse(data);
+    
+    if (!validatedData.success) {
+      return NextResponse.json({ error: "Validation Failed", details: validatedData.error.format() }, { status: 400 });
     }
+
+    const { name, month, year, startDate, endDate, isActive, bpRemarks, rpRemarks } = validatedData.data;
 
     const newCycle = await prisma.cycle.create({
       data: {

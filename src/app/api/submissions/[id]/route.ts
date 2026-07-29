@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/authHelpers";
+import { SubmissionSchema } from "@/lib/validations";
 
 export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const userId = (session.user as any).id;
-    const userRole = (session.user as any).role;
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
+    const { userId, userRole } = auth;
 
     const params = await props.params;
     const id = params.id;
@@ -40,10 +39,9 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
 
 export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const userId = (session.user as any).id;
-    const userRole = (session.user as any).role;
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
+    const { userId, userRole } = auth;
 
     const params = await props.params;
     const id = params.id;
@@ -59,8 +57,19 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
       }
     }
 
+    if (oldSub.cycleId) {
+      const cycle = await prisma.cycle.findUnique({ where: { id: oldSub.cycleId } });
+      if (cycle) {
+        if (!cycle.isActive || (cycle.endDate && new Date() > cycle.endDate)) {
+          if (userRole !== 'SuperAdmin') {
+            return NextResponse.json({ error: "Cannot edit submissions in a locked or ended cycle" }, { status: 403 });
+          }
+        }
+      }
+    }
+
     // Preserve status if it is already Accepted/Rejected so Admin edits don't revert it
-    const newStatus = (oldSub.status === 'Accepted' || oldSub.status === 'Rejected') ? oldSub.status : data.status;
+    const newStatus = (oldSub.status === 'Accepted' || oldSub.status === 'Rejected') && userRole !== 'SuperAdmin' ? oldSub.status : data.status;
 
     // Handle dynamic department assignment
     const deptName = data.scannedDepartment || "Mechanical";
@@ -78,7 +87,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         departmentId: department.id,
         title: data.title,
         description: data.description,
-        status: newStatus,
+        status: newStatus as any,
         objective: data.objective,
         problemAddressed: data.problemAddressed,
         methodology: data.methodology,
@@ -96,6 +105,22 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
         supportingImages: data.supportingImages || [],
         cycleId: data.cycleId || null
+      }
+    });
+
+    // Save Version History
+    const maxVersion = await prisma.submissionVersion.findFirst({ 
+      where: { submissionId: id }, 
+      orderBy: { versionNum: 'desc' } 
+    });
+    const nextVersionNum = maxVersion ? maxVersion.versionNum + 1 : 1;
+
+    await prisma.submissionVersion.create({
+      data: {
+        submissionId: id,
+        versionNum: nextVersionNum,
+        dataSnapshot: oldSub as any,
+        updatedById: userId
       }
     });
 
@@ -118,10 +143,9 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
 
 export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const userId = (session.user as any).id;
-    const userRole = (session.user as any).role;
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
+    const { userId, userRole } = auth;
 
     const params = await props.params;
     const id = params.id;

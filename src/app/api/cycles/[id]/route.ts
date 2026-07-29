@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authHelpers";
+import { CycleSchema } from "@/lib/validations";
 
 export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const userRole = (session.user as any).role;
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
 
     const params = await props.params;
-    const { name, month, year, startDate, endDate, isActive, bpRemarks, rpRemarks } = await req.json();
+    const data = await req.json();
+    
+    // We parse as partial because updates might only send some fields.
+    const validatedData = CycleSchema.partial().safeParse(data);
+    if (!validatedData.success) {
+      return NextResponse.json({ error: "Validation Failed", details: validatedData.error.format() }, { status: 400 });
+    }
+    
+    const { name, month, year, startDate, endDate, isActive, bpRemarks, rpRemarks, isArchived } = validatedData.data;
 
     const cycle = await prisma.cycle.update({
       where: { id: params.id },
@@ -23,7 +29,8 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         endDate: endDate ? new Date(endDate) : undefined,
         isActive,
         bpRemarks,
-        rpRemarks
+        rpRemarks,
+        isArchived
       }
     });
 
@@ -36,10 +43,8 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
 
 export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const userRole = (session.user as any).role;
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
 
     const params = await props.params;
     

@@ -5,21 +5,72 @@ import { QRCodeSVG } from "qrcode.react";
 import { X, Plus, Image as ImageIcon } from "lucide-react";
 import "./workshop.css";
 
-const uploadImage = async (file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
-  try {
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    return data.success ? data.url : null;
-  } catch(e) {
-    return null;
-  }
+const uploadImage = async (file: File, onProgress?: (pct: number) => void) => {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload", true);
+    
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          onProgress(percentComplete);
+        }
+      };
+    }
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+              resolve(data.url);
+            } else {
+              alert("Upload failed: " + (data.error || "Unknown error"));
+              resolve(null);
+            }
+          } catch {
+            alert("Upload failed: Invalid response");
+            resolve(null);
+          }
+        } else {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            alert("Upload failed: " + (data.error || xhr.statusText));
+          } catch {
+            alert("Upload failed: " + xhr.statusText);
+          }
+          resolve(null);
+        }
+      };
+      
+      xhr.onerror = () => {
+        alert("Upload failed: Network error");
+        resolve(null);
+      };
+
+    const formData = new FormData();
+    formData.append("file", file);
+    xhr.send(formData);
+  });
 };
 
 function LiveEditModal({ slide, onSave, onClose }: { slide: any, onSave: (s: any) => void, onClose: () => void }) {
-  const [data, setData] = useState<any>(JSON.parse(JSON.stringify(slide)));
+  const initialData = JSON.parse(JSON.stringify(slide));
+  Object.keys(initialData).forEach(k => {
+    if (initialData[k] === null) initialData[k] = "";
+  });
+  
+  const [data, setData] = useState<any>({
+    beforeImageUrl: "",
+    afterImageUrl: "",
+    attachmentUrl: "",
+    whyWhyAnalysis: "[]",
+    customTable: "[]",
+    ...initialData
+  });
   const [uploading, setUploading] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   const tableFields = ['calculationTable', 'impactCalculation', 'actionTakenTable'];
   const imageFields = ['beforeImageUrl', 'afterImageUrl', 'attachmentUrl'];
@@ -135,13 +186,21 @@ function LiveEditModal({ slide, onSave, onClose }: { slide: any, onSave: (s: any
             const f = e.target.files?.[0];
             if (!f) return;
             setUploading(key);
-            const url = await uploadImage(f);
+            setUploadProgress(0);
+            const url = await uploadImage(f, (pct) => setUploadProgress(pct));
             if (url) setData({ ...data, [key]: url });
             setUploading(null);
           }} />
-          <button type="button" onClick={() => document.getElementById(`file-${key}`)?.click()} className="btn" style={{ padding: '0.5rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <ImageIcon size={16} /> {uploading === key ? "Uploading..." : "Upload"}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            <button type="button" onClick={() => document.getElementById(`file-${key}`)?.click()} className="btn" style={{ padding: '0.5rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <ImageIcon size={16} /> {uploading === key ? `Uploading ${uploadProgress}%` : "Upload"}
+            </button>
+            {uploading === key && (
+              <div style={{ width: '100%', height: '4px', backgroundColor: '#eee', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: '#4A90E2', transition: 'width 0.2s' }} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -196,14 +255,39 @@ export default function WorkshopMode() {
   const [editingSlide, setEditingSlide] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState("");
+  const [reportFileUrl, setReportFileUrl] = useState<string | null>(null);
+
+  const [customColors, setCustomColors] = useState({
+    bg: "#F0F4F8",
+    textBody: "#333333",
+    textHeading: "#0A3D62",
+    accentPrimary: "#7DB87F",
+    accentSecondary: "#F4805A",
+    accentTertiary: "#4A90E2",
+    isDarkMode: false
+  });
+  const [useCustomColors, setUseCustomColors] = useState(false);
+
   useEffect(() => {
-    fetch('/api/network-ip')
-      .then(r => r.json())
-      .then(res => {
-        if (res.origin) setOrigin(res.origin);
-        else setOrigin(window.location.origin);
-      })
-      .catch(() => setOrigin(window.location.origin));
+    // If the user accesses the app via a public URL (like ngrok, localtunnel, or vercel)
+    // we should just use that URL instead of falling back to the local network IP!
+    const hostname = window.location.hostname;
+    const isLocalhostOrIp = hostname === 'localhost' || hostname === '127.0.0.1' || /^172\./.test(hostname);
+    
+    if (!isLocalhostOrIp) {
+      setOrigin(window.location.origin);
+    } else {
+      fetch("/api/network-ip")
+        .then(r => r.json())
+        .then(res => {
+          if (res.origin) setOrigin(res.origin);
+          else setOrigin(window.location.origin);
+        })
+        .catch(() => setOrigin(window.location.origin));
+    }
     
     fetch('/api/cycles')
       .then(r => r.json())
@@ -220,7 +304,7 @@ export default function WorkshopMode() {
       })
       .catch(console.error);
     
-    fetch('/api/submissions')
+    fetch('/api/submissions?limit=1000')
       .then(r => r.json())
       .then(res => {
         if (res.data) {
@@ -308,37 +392,70 @@ export default function WorkshopMode() {
     if (currentSlideIndex > 0) setCurrentSlideIndex(prev => prev - 1);
   };
 
+  const moveSlide = (index: number, direction: 'up' | 'down') => {
+    const newSubs = [...submissions];
+    if (direction === 'up' && index > 0) {
+      const temp = newSubs[index - 1];
+      newSubs[index - 1] = newSubs[index];
+      newSubs[index] = temp;
+    } else if (direction === 'down' && index < newSubs.length - 1) {
+      const temp = newSubs[index + 1];
+      newSubs[index + 1] = newSubs[index];
+      newSubs[index] = temp;
+    }
+    setSubmissions(newSubs);
+  };
+
   const handleExport = async () => {
     try {
-      const response = await fetch('/api/workshop/generate-ppt', { 
+      setIsGenerating(true);
+      setGenerationProgress(0);
+      setGenerationStatus("Pending");
+      setReportFileUrl(null);
+
+      const response = await fetch('/api/workshop/reports', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           template: templateStyle,
+          customColors: useCustomColors ? customColors : null,
           submissions: submissions,
-          allSubmissions: allSubmissions 
+          allSubmissions: allSubmissions,
+          origin: window.location.origin
         })
       });
-      if (!response.ok) throw new Error('Failed to generate PPT');
+      if (!response.ok) throw new Error('Failed to initiate PPT generation');
       const data = await response.json();
       
-      const byteCharacters = atob(data.base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      if (data.reportId) {
+        const interval = setInterval(async () => {
+          try {
+            const res = await fetch(`/api/workshop/reports/${data.reportId}`);
+            const progressData = await res.json();
+            if (progressData.success) {
+              setGenerationProgress(progressData.data.progress);
+              setGenerationStatus(progressData.data.status);
+              
+              if (progressData.data.status === "Completed") {
+                clearInterval(interval);
+                setReportFileUrl(progressData.data.fileUrl);
+                // Do not set isGenerating to false here, so the user can see the download button
+              } else if (progressData.data.status === "Failed") {
+                clearInterval(interval);
+                setIsGenerating(false);
+                alert("Generation failed on the server.");
+              }
+            }
+          } catch(e) {
+            console.error("Polling error", e);
+          }
+        }, 2000);
+      } else {
+         setIsGenerating(false);
+         alert("Could not start generation.");
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
-      
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `JSPL_Workshop_${new Date().toISOString().split('T')[0]}.pptx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
     } catch (error) {
+      setIsGenerating(false);
       alert('Error generating PowerPoint.');
     }
   };
@@ -436,10 +553,69 @@ export default function WorkshopMode() {
         cardBg: '#FFF8DC',
         logoStyle: { position: 'absolute', top: '2rem', left: '3rem', width: '80px', height: '80px', borderRadius: '12px', zIndex: 10, objectFit: 'cover' } as any,
         headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '12px', backgroundColor: '#B8860B', zIndex: 10 }} />
+      },
+      neon: {
+        bg: '#0F0F1A',
+        text: '#E0E0FF',
+        heading: '#00FFAA',
+        accent: '#FF00AA',
+        cardBg: '#1A1A2E',
+        logoStyle: { position: 'absolute', top: '2rem', right: '3rem', width: '80px', height: '80px', borderRadius: '12px', zIndex: 10, filter: 'hue-rotate(90deg) brightness(1.5)', objectFit: 'cover' } as any,
+        headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '8px', backgroundColor: '#FF00AA', zIndex: 10 }} />
+      },
+      minimalWhite: {
+        bg: '#FFFFFF',
+        text: '#222222',
+        heading: '#111111',
+        accent: '#555555',
+        cardBg: '#F9F9F9',
+        logoStyle: { position: 'absolute', top: '2rem', left: '3rem', width: '80px', height: '80px', borderRadius: '12px', zIndex: 10, objectFit: 'cover' } as any,
+        headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', backgroundColor: '#333333', zIndex: 10 }} />
+      },
+      royalPurple: {
+        bg: 'linear-gradient(135deg, #2D1B4E 0%, #1A0B2E 100%)',
+        text: '#E6D8F8',
+        heading: '#D4B5FF',
+        accent: '#9B51E0',
+        cardBg: 'rgba(255, 255, 255, 0.05)',
+        logoStyle: { position: 'absolute', top: '2rem', right: '3rem', width: '80px', height: '80px', borderRadius: '12px', zIndex: 10, objectFit: 'cover' } as any,
+        headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '6px', backgroundColor: '#9B51E0', zIndex: 10 }} />
+      },
+      pastel: {
+        bg: '#FDF6E3',
+        text: '#5C4B51',
+        heading: '#8CBEB2',
+        accent: '#F2EBBF',
+        cardBg: '#FFFFFF',
+        logoStyle: { position: 'absolute', top: '2rem', right: '3rem', width: '80px', height: '80px', borderRadius: '12px', zIndex: 10, objectFit: 'cover' } as any,
+        headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '10px', backgroundColor: '#F3B562', zIndex: 10 }} />
+      },
+      forest: {
+        bg: '#1C3127',
+        text: '#D1E8E2',
+        heading: '#A3E4D7',
+        accent: '#58D68D',
+        cardBg: '#274436',
+        logoStyle: { position: 'absolute', top: '2rem', left: '3rem', width: '80px', height: '80px', borderRadius: '12px', zIndex: 10, objectFit: 'cover' } as any,
+        headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '5px', backgroundColor: '#58D68D', zIndex: 10 }} />
       }
     };
     
-    const t = styles[templateStyle as keyof typeof styles] || styles.corporate;
+    let t = styles[templateStyle as keyof typeof styles] || styles.corporate;
+
+    if (useCustomColors) {
+      t = {
+        ...t,
+        bg: `#${customColors.bg}`,
+        text: `#${customColors.textBody}`,
+        heading: `#${customColors.textHeading}`,
+        accent: `#${customColors.accentPrimary}`,
+        headerBar: <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '10px', backgroundColor: `#${customColors.accentPrimary}`, zIndex: 10 }} />
+      };
+      if (customColors.isDarkMode) {
+        t.cardBg = '#2D3748';
+      }
+    }
 
     const renderWrapper = (children: React.ReactNode) => (
       <div style={{ position: 'relative', width: '100%', height: '100%', background: t.bg, padding: '4rem 3rem 2rem 3rem', color: t.text, fontFamily: "'Poppins', sans-serif" }}>
@@ -833,7 +1009,7 @@ export default function WorkshopMode() {
                     <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>WHY-WHY ANALYSIS</div>
                     {(() => {
                       try {
-                        const whys = JSON.parse(currentSlide.whyWhyAnalysis || "[]");
+                        const whys = typeof currentSlide.whyWhyAnalysis === 'string' ? JSON.parse(currentSlide.whyWhyAnalysis) : (currentSlide.whyWhyAnalysis || []);
                         return whys.map((why: string, i: number) => why ? <div key={i} style={{ fontSize: '0.85rem', marginBottom: '4px' }}><strong>Why {i+1}:</strong> {why}</div> : null);
                       } catch(e) { return null; }
                     })()}
@@ -844,12 +1020,12 @@ export default function WorkshopMode() {
               <>
                 <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>CUSTOM TABLE</div>
-                  <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: '60vh' }}>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: '35vh' }}>
                     <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
                       <tbody>
                         {(() => {
                           try {
-                            const table = JSON.parse(currentSlide.customTable || "[]");
+                            const table = typeof currentSlide.customTable === 'string' ? JSON.parse(currentSlide.customTable) : currentSlide.customTable;
                             if (Array.isArray(table) && table.length > 0) {
                               const numCols = Math.max(...table.map((r: any[]) => r?.length || 0));
                               return table.map((row: string[], i: number) => {
@@ -881,13 +1057,13 @@ export default function WorkshopMode() {
             {currentSlide.type === "BestPractice" ? (
               <>
                 {currentSlide.calculationTable && (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ color: t.heading, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>CALCULATION TABLE</div>
-                    <div style={{ width: '100%', overflowX: 'auto' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                    <div style={{ color: t.heading, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem', flexShrink: 0 }}>CALCULATION TABLE</div>
+                    <div style={{ width: '100%', overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                       <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', backgroundColor: t.cardBg }}>
                           {(() => {
                             try {
-                              const parsedTable = JSON.parse(currentSlide.calculationTable);
+                              const parsedTable = typeof currentSlide.calculationTable === 'string' ? JSON.parse(currentSlide.calculationTable) : currentSlide.calculationTable;
                               if (Array.isArray(parsedTable) && parsedTable.length > 0) {
                                 const isLegacy = !Array.isArray(parsedTable[0]);
                                 if (isLegacy) {
@@ -942,33 +1118,47 @@ export default function WorkshopMode() {
                     </div>
                   </div>
                 )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>PHOTOS & EVIDENCE</div>
-                  <div style={{ display: 'flex', gap: '1rem', height: '200px' }}>
-                    <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ flex: 1, backgroundImage: currentSlide.beforeImageUrl ? `url('${currentSlide.beforeImageUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                      <div style={{ height: '20px', backgroundColor: '#CCC', color: '#111', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>BEFORE</div>
+                <div style={{ flexShrink: 0, height: '220px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem', flexShrink: 0 }}>PHOTOS & EVIDENCE</div>
+                  <div style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0 }}>
+                    <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                      {currentSlide.beforeImageUrl ? (
+                        <img src={currentSlide.beforeImageUrl} style={{ width: '100%', height: 'calc(100% - 20px)', objectFit: 'contain' }} alt="Before" />
+                      ) : (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '0.8rem' }}>No Image</div>
+                      )}
+                      <div style={{ height: '20px', backgroundColor: '#CCC', color: '#111', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: 0, width: '100%' }}>BEFORE</div>
                     </div>
-                    <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ flex: 1, backgroundImage: currentSlide.afterImageUrl ? `url('${currentSlide.afterImageUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                      <div style={{ height: '20px', backgroundColor: t.accent, color: '#111', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>AFTER</div>
+                    
+                    <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                      {currentSlide.afterImageUrl ? (
+                        <img src={currentSlide.afterImageUrl} style={{ width: '100%', height: 'calc(100% - 20px)', objectFit: 'contain' }} alt="After" />
+                      ) : (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '0.8rem' }}>No Image</div>
+                      )}
+                      <div style={{ height: '20px', backgroundColor: t.accent, color: '#111', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: 0, width: '100%' }}>AFTER</div>
                     </div>
-                    <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ flex: 1, backgroundImage: currentSlide.attachmentUrl ? `url('${currentSlide.attachmentUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                      <div style={{ height: '20px', backgroundColor: '#666', color: '#FFF', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SUPPORTING</div>
+                    
+                    <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                      {currentSlide.attachmentUrl ? (
+                        <img src={currentSlide.attachmentUrl} style={{ width: '100%', height: 'calc(100% - 20px)', objectFit: 'contain' }} alt="Supporting" />
+                      ) : (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '0.8rem' }}>No File</div>
+                      )}
+                      <div style={{ height: '20px', backgroundColor: '#666', color: '#FFF', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: 0, width: '100%' }}>SUPPORTING</div>
                     </div>
                   </div>
                 </div>
               </>
             ) : currentSlide.type === "RepetitiveProblem" ? (
               <>
-                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem' }}>ACTION TAKEN TABLE</div>
-                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '35vh' }}>
+                <div style={{ backgroundColor: t.cardBg, border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.2rem', flexShrink: 0 }}>ACTION TAKEN TABLE</div>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                   <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', backgroundColor: t.cardBg, minWidth: 'max-content' }}>
                     {(() => {
                       try {
-                        const table = JSON.parse(currentSlide.actionTakenTable || "[]");
+                        const table = typeof currentSlide.actionTakenTable === 'string' ? JSON.parse(currentSlide.actionTakenTable) : currentSlide.actionTakenTable;
                         if (!table || table.length === 0) return null;
                         const isLegacy = !Array.isArray(table[0]);
                         if (isLegacy) {
@@ -1016,13 +1206,13 @@ export default function WorkshopMode() {
                   </div>
                 </div>
 
-                <div style={{ backgroundColor: templateStyle === 'dark' ? '#111' : '#EAF4F4', border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px' }}>
-                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem' }}>IMPACT CALCULATION</div>
-                  <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '35vh' }}>
+                <div style={{ backgroundColor: templateStyle === 'dark' ? '#111' : '#EAF4F4', border: `1px solid ${t.accent}`, padding: '0.5rem 1rem', borderRadius: '4px', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <div style={{ color: t.accent, fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '0.5rem', flexShrink: 0 }}>IMPACT CALCULATION</div>
+                  <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                   <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', minWidth: 'max-content' }}>
                     {(() => {
                       try {
-                        const table = JSON.parse(currentSlide.impactCalculation || "[]");
+                        const table = typeof currentSlide.impactCalculation === 'string' ? JSON.parse(currentSlide.impactCalculation) : currentSlide.impactCalculation;
                         if (!table || table.length === 0) return null;
                         const isLegacy = !Array.isArray(table[0]);
                         if (isLegacy) {
@@ -1070,12 +1260,14 @@ export default function WorkshopMode() {
                   </div>
                 </div>
 
-                {currentSlide.attachmentUrl && (
-                  <div style={{ flex: 1, backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: '130px' }}>
-                    <div style={{ flex: 1, backgroundImage: `url('${currentSlide.attachmentUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                    <div style={{ height: '20px', backgroundColor: '#666', color: '#FFF', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SUPPORTING EVIDENCE</div>
-                  </div>
-                )}
+                <div style={{ flexShrink: 0, height: '180px', backgroundColor: 'rgba(255,255,255,0.05)', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                  {currentSlide.attachmentUrl ? (
+                    <img src={currentSlide.attachmentUrl} style={{ width: '100%', height: 'calc(100% - 20px)', objectFit: 'contain' }} alt="Supporting Evidence" />
+                  ) : (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '0.8rem' }}>No File</div>
+                  )}
+                  <div style={{ height: '20px', backgroundColor: '#666', color: '#FFF', fontSize: '0.7rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: 0, width: '100%' }}>SUPPORTING EVIDENCE</div>
+                </div>
               </>
             ) : (
               <>
@@ -1083,7 +1275,7 @@ export default function WorkshopMode() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', flex: 1 }}>
                   {currentSlide.supportingImages && currentSlide.supportingImages.map((img: string, idx: number) => (
                     <div key={idx} style={{ backgroundColor: '#111', border: `2px solid ${t.accent}`, position: 'relative', display: 'flex', flexDirection: 'column', minHeight: '150px', gridColumn: idx === 2 ? 'span 2' : 'span 1' }}>
-                      <div style={{ flex: 1, backgroundImage: `url('${img}')`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />
+                      <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Supporting Picture" />
                     </div>
                   ))}
                 </div>
@@ -1104,7 +1296,10 @@ export default function WorkshopMode() {
             className="input-field" 
             style={{ width: '200px', padding: '0.5rem', backgroundColor: 'white', color: '#333' }}
             value={templateStyle}
-            onChange={(e) => setTemplateStyle(e.target.value)}
+            onChange={(e) => {
+              setTemplateStyle(e.target.value);
+              setUseCustomColors(false);
+            }}
           >
             <option value="corporate">Corporate Standard</option>
             <option value="modern">Modern Translucent</option>
@@ -1116,25 +1311,72 @@ export default function WorkshopMode() {
             <option value="oceanic">Oceanic Blue</option>
             <option value="sunset">Sunset Orange</option>
             <option value="elegant">Elegant Gold</option>
+            <option value="neon">Neon Cyberpunk</option>
+            <option value="minimalWhite">Minimalist White</option>
+            <option value="royalPurple">Royal Purple</option>
+            <option value="pastel">Pastel Dream</option>
+            <option value="forest">Forest Green</option>
           </select>
           <button className="btn" onClick={toggleFullscreen}>
             {isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
           </button>
-          <button className="btn btn-primary" onClick={handleExport}>
-            Export to PowerPoint
+          <button className="btn btn-primary" onClick={handleExport} disabled={isGenerating}>
+            {isGenerating ? 'Generating...' : 'Export to PowerPoint'}
           </button>
         </div>
       </div>
 
-      <div className="workshop-layout" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ width: '100%', maxWidth: '1200px', aspectRatio: '16/9', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #ccc', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-          {renderSlide()}
+      <div className="workshop-layout" style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: '1200px', aspectRatio: '16/9', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #ccc', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            {renderSlide()}
+          </div>
+          
+          <div className="presentation-controls" style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button className="btn" onClick={prevSlide} disabled={currentSlideIndex === 0}>&larr; Previous</button>
+            <span style={{ fontWeight: 'bold' }}>Slide {currentSlideIndex + 1} of {slides.length}</span>
+            <button className="btn" onClick={nextSlide} disabled={currentSlideIndex === slides.length - 1}>Next &rarr;</button>
+          </div>
         </div>
-        
-        <div className="presentation-controls" style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button className="btn" onClick={prevSlide} disabled={currentSlideIndex === 0}>&larr; Previous</button>
-          <span style={{ fontWeight: 'bold' }}>Slide {currentSlideIndex + 1} of {slides.length}</span>
-          <button className="btn" onClick={nextSlide} disabled={currentSlideIndex === slides.length - 1}>Next &rarr;</button>
+
+        {/* Sidebar for Settings and Ordering */}
+        <div style={{ width: '350px', backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', flexShrink: 0, maxHeight: '80vh', overflowY: 'auto' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.5rem' }}>Admin Settings</h3>
+          
+          <div style={{ marginBottom: '2rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+              <input type="checkbox" checked={useCustomColors} onChange={(e) => setUseCustomColors(e.target.checked)} />
+              Use Custom Colors
+            </label>
+            
+            {useCustomColors && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', paddingLeft: '1.5rem' }}>
+                <label>Background: <input type="color" value={`#${customColors.bg}`} onChange={e => setCustomColors({...customColors, bg: e.target.value.substring(1)})} /></label>
+                <label>Text Body: <input type="color" value={`#${customColors.textBody}`} onChange={e => setCustomColors({...customColors, textBody: e.target.value.substring(1)})} /></label>
+                <label>Text Heading: <input type="color" value={`#${customColors.textHeading}`} onChange={e => setCustomColors({...customColors, textHeading: e.target.value.substring(1)})} /></label>
+                <label>Primary Accent: <input type="color" value={`#${customColors.accentPrimary}`} onChange={e => setCustomColors({...customColors, accentPrimary: e.target.value.substring(1)})} /></label>
+                <label>Secondary Accent: <input type="color" value={`#${customColors.accentSecondary}`} onChange={e => setCustomColors({...customColors, accentSecondary: e.target.value.substring(1)})} /></label>
+                <label><input type="checkbox" checked={customColors.isDarkMode} onChange={e => setCustomColors({...customColors, isDarkMode: e.target.checked})} /> Dark Mode Tuning</label>
+              </div>
+            )}
+          </div>
+
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.5rem' }}>Slide Reordering</h3>
+          <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem' }}>Reorder Submissions before generating. (Cover, Agenda, and Trackers are fixed).</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {submissions.map((sub, idx) => (
+              <div key={sub.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '4px', border: '1px solid #ddd' }}>
+                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }} title={sub.title}>
+                  {sub.type === 'SupportingSlide' ? '📎 ' : (sub.type === 'BestPractice' ? '⭐ ' : '⚠️ ')}
+                  {sub.title}
+                </span>
+                <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  <button onClick={() => moveSlide(idx, 'up')} disabled={idx === 0} style={{ padding: '0 0.4rem', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}>↑</button>
+                  <button onClick={() => moveSlide(idx, 'down')} disabled={idx === submissions.length - 1} style={{ padding: '0 0.4rem', cursor: idx === submissions.length - 1 ? 'not-allowed' : 'pointer' }}>↓</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1150,6 +1392,33 @@ export default function WorkshopMode() {
             setEditingSlide(null);
           }}
         />
+      )}
+
+      {isGenerating && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: 'white', padding: '3rem', borderRadius: '16px', width: '400px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>Generating Presentation</h2>
+            
+            {!reportFileUrl && generationStatus !== 'Failed' && (
+              <>
+                <p style={{ color: '#666', marginBottom: '2rem' }}>Status: {generationStatus} ({generationProgress}%)</p>
+                <div style={{ width: '100%', height: '12px', backgroundColor: '#f0f0f0', borderRadius: '6px', overflow: 'hidden', marginBottom: '1rem' }}>
+                  <div style={{ width: `${generationProgress}%`, height: '100%', backgroundColor: '#4A90E2', transition: 'width 0.3s ease' }} />
+                </div>
+                <p style={{ fontSize: '0.9rem', color: '#999' }}>Optimizing images and building slides... This may take a few minutes for large reports.</p>
+              </>
+            )}
+
+            {reportFileUrl && (
+              <>
+                <div style={{ fontSize: '4rem', color: '#7DB87F', marginBottom: '1rem' }}>✓</div>
+                <p style={{ color: '#666', marginBottom: '2rem' }}>Presentation generated successfully!</p>
+                <a href={reportFileUrl} download className="btn btn-primary" style={{ display: 'inline-block', width: '100%' }}>Download PowerPoint</a>
+                <button onClick={() => { setIsGenerating(false); setReportFileUrl(null); }} className="btn" style={{ width: '100%', marginTop: '1rem' }}>Close</button>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Calendar, Plus, X, Edit, Trash2, Power } from "lucide-react";
+import { Calendar, Plus, X, Edit, Trash2, Power, Archive } from "lucide-react";
 
 export default function CyclesClient() {
   const [cycles, setCycles] = useState<any[]>([]);
@@ -115,6 +115,36 @@ export default function CyclesClient() {
         fetchCycles();
       } else {
         alert(data.error || "Failed to update cycle status.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred.");
+    }
+  };
+
+  const handleArchive = async (c: any) => {
+    if (!confirm(`Are you sure you want to archive the ${c.name} cycle? It will be hidden from this view.`)) return;
+    try {
+      const res = await fetch(`/api/cycles/${c.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: c.name,
+          month: c.month,
+          year: c.year,
+          startDate: c.startDate,
+          endDate: c.endDate,
+          isActive: c.isActive,
+          bpRemarks: c.bpRemarks,
+          rpRemarks: c.rpRemarks,
+          isArchived: true
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchCycles();
+      } else {
+        alert(data.error || "Failed to archive cycle.");
       }
     } catch (err) {
       console.error(err);
@@ -249,6 +279,7 @@ export default function CyclesClient() {
                         setShowEditModal(true);
                       }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--jspl-blue)' }} title="Edit"><Edit size={16} /></button>
                       <button onClick={() => handleToggleStatus(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--success)' }} title="Open Cycle"><Power size={16} /></button>
+                      <button onClick={() => handleArchive(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }} title="Archive Cycle"><Archive size={16} /></button>
                       <button onClick={() => handleDelete(c.id, c.name)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }} title="Delete"><Trash2 size={16} /></button>
                     </div>
                   </td>

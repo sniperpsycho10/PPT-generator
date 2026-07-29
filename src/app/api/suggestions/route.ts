@@ -1,38 +1,40 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireUser } from "@/lib/authHelpers";
+import { SuggestionSchema } from "@/lib/validations";
 
 export async function POST(req: Request) {
   try {
     const contentType = req.headers.get("content-type") || "";
-    let guestName = "Anonymous";
-    let guestDept = "General";
-    let suggestionText = "";
-    let submissionId = null;
 
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      const formData = await req.formData();
-      guestName = formData.get("guestName")?.toString() || "Anonymous";
-      guestDept = formData.get("guestDept")?.toString() || "General";
-      suggestionText = formData.get("suggestionText")?.toString() || "";
-      submissionId = formData.get("submissionId")?.toString() || null;
-    } else {
-      const body = await req.json();
-      guestName = body.guestName || "Anonymous";
-      guestDept = body.guestDept || "General";
-      suggestionText = body.suggestionText;
-      submissionId = body.submissionId || null;
-    }
 
-    if (!suggestionText) {
+      let bodyData: any = {};
       if (contentType.includes("application/x-www-form-urlencoded")) {
-        const host = req.headers.get("host") || "localhost:4000";
-        const protocol = req.headers.get("x-forwarded-proto") || "http";
-        return NextResponse.redirect(`${protocol}://${host}/feedback?error=missing_text`, { status: 303 });
+        const formData = await req.formData();
+        bodyData = {
+          guestName: formData.get("guestName")?.toString(),
+          guestDept: formData.get("guestDept")?.toString(),
+          suggestionText: formData.get("suggestionText")?.toString(),
+          submissionId: formData.get("submissionId")?.toString() || null,
+        };
+      } else {
+        bodyData = await req.json();
       }
-      return NextResponse.json({ error: "Suggestion text is required" }, { status: 400 });
-    }
+
+      const validatedData = SuggestionSchema.safeParse(bodyData);
+      
+      if (!validatedData.success) {
+        if (contentType.includes("application/x-www-form-urlencoded")) {
+          const host = req.headers.get("host") || "localhost:4000";
+          const protocol = req.headers.get("x-forwarded-proto") || "http";
+          return NextResponse.redirect(`${protocol}://${host}/feedback?error=missing_text`, { status: 303 });
+        }
+        return NextResponse.json({ error: "Validation Failed", details: validatedData.error.format() }, { status: 400 });
+      }
+
+      const { guestName, guestDept, suggestionText, submissionId } = validatedData.data;
+
+
 
     const suggestion = await prisma.suggestion.create({
       data: {
@@ -65,13 +67,9 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const userId = (session.user as any).id;
-    
-    const dbUser = await prisma.user.findUnique({ where: { id: userId } });
-    const userRole = dbUser?.role;
+    const auth = await requireUser();
+    if (auth.error) return auth.error;
+    const { userId, userRole } = auth;
 
     let whereClause: any = { deletedAt: null };
     if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {

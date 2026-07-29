@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authHelpers";
 
 export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as any)?.role;
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
-    }
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { userId, userRole } = auth;
 
     const { role, departmentId } = await req.json();
     const params = await props.params;
@@ -38,7 +35,7 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
           entityId: targetUserId,
           entityType: 'User',
           action: 'UPDATE',
-          userId: (session?.user as any)?.id,
+          userId: userId,
           changedFields: { newRole: role }
         }
       });
@@ -53,11 +50,9 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
 
 export async function DELETE(req: Request, props: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as any)?.role;
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
-    }
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { userId, userRole } = auth;
 
     const params = await props.params;
     const targetUserId = params.id;
@@ -86,7 +81,7 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
         entityId: targetUserId,
         entityType: 'User',
         action: 'DELETE',
-        userId: (session?.user as any)?.id,
+        userId: userId,
         changedFields: { email: deletedUser.email }
       }
     });

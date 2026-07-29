@@ -13,7 +13,11 @@ import {
   GitPullRequestDraft,
   MessageSquarePlus,
   Users,
-  Calendar
+  Calendar,
+  RefreshCw,
+  FileArchive,
+  BarChart3,
+  TrendingUp
 } from "lucide-react";
 
 export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
@@ -63,9 +67,29 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
             <Calendar size={18} />
             Cycles
           </Link>
+          <Link href="/dashboard/cycles/recurring" className={getClassName("/dashboard/cycles/recurring")}>
+            <RefreshCw size={18} />
+            Bulk Generate Cycles
+          </Link>
           <Link href="/dashboard/workshop" className={getClassName("/dashboard/workshop")}>
             <Presentation size={18} />
             Workshop Mode
+          </Link>
+          <Link href="/dashboard/reports/history" className={getClassName("/dashboard/reports/history")}>
+            <FileText size={18} />
+            Generated PPTs
+          </Link>
+          <Link href="/dashboard/attachments" className={getClassName("/dashboard/attachments")}>
+            <FileArchive size={18} />
+            Attachments
+          </Link>
+          <Link href="/dashboard/reports/adoptions" className={getClassName("/dashboard/reports/adoptions")}>
+            <BarChart3 size={18} />
+            Adoptions Report
+          </Link>
+          <Link href="/dashboard/analytics" className={getClassName("/dashboard/analytics")}>
+            <TrendingUp size={18} />
+            Reporting Analytics
           </Link>
           
           <Link href="/dashboard/settings" className={getClassName("/dashboard/settings")}>

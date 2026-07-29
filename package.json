@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "jest",
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -23,18 +25,24 @@
     "react": "19.2.4",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "19.2.4",
-    "xlsx": "^0.18.5"
+    "sharp": "^0.35.3",
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "jest": "^30.4.2",
+    "node-mocks-http": "^1.18.1",
     "prisma": "^5.14.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.12",
     "typescript": "^5"
   }
 }

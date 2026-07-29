@@ -40,6 +40,20 @@ export default function ActionButtons({ id, isAdmin, status }: { id: string, isA
 
   return (
     <div style={{ display: 'flex', gap: '8px' }}>
+      <button 
+        onClick={() => router.push(`/dashboard/submissions/${id}`)}
+        style={{ 
+          padding: '4px 8px', 
+          backgroundColor: '#f3e8ff', 
+          color: '#7e22ce', 
+          border: 'none', 
+          borderRadius: '4px', 
+          cursor: 'pointer',
+          fontSize: '0.8rem'
+        }}
+      >
+        View
+      </button>
       {(!isLocked || isAdmin) && (
         <button 
           onClick={handleEdit}

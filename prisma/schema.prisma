@@ -85,6 +85,9 @@ model User {
   notifications Notification[]
   adoptions     Adoption[]
   auditLogs     AuditLog[]
+  comments      Comment[]
+  versions      SubmissionVersion[]
+  reports       GeneratedReport[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
@@ -176,8 +179,11 @@ model Submission {
 
   status          SubmissionStatus
   submissionMonth DateTime         @default(now())
+  deadline        DateTime?
   suggestions     Suggestion[]
   adoptions       Adoption[]
+  comments        Comment[]
+  versions        SubmissionVersion[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   deletedAt       DateTime?
@@ -198,6 +204,7 @@ model Cycle {
   bpRemarks   String?
   rpRemarks   String?
   createdById String?
+  isArchived  Boolean      @default(false)
   submissions Submission[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -229,6 +236,7 @@ model Suggestion {
 
   actionItems ActionItem[]
   progressLog SuggestionProgress[]
+  comments    Comment[]
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
   deletedAt   DateTime?
@@ -310,4 +318,59 @@ model AuditLog {
 
   @@index([entityId, entityType])
   @@index([userId])
+}
+
+model Comment {
+  id             String      @id @default(uuid())
+  text           String
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissionId   String?
+  submission     Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  suggestionId   String?
+  suggestion     Suggestion? @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+
+  @@index([submissionId])
+  @@index([suggestionId])
+  @@index([userId])
+}
+
+model SubmissionVersion {
+  id           String     @id @default(uuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  versionNum   Int
+  dataSnapshot Json
+  updatedById  String?
+  updatedBy    User?      @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+
+  @@index([submissionId])
+}
+
+model GeneratedReport {
+  id          String   @id @default(uuid())
+  title       String
+  fileUrl     String?
+  status      String   @default("Pending") // Pending, Generating, Completed, Failed
+  progress    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  hash         String   @unique
+  filePath     String
+  url          String
+  createdAt    DateTime @default(now())
 }

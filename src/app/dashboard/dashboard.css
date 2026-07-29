@@ -40,6 +40,23 @@
   flex-direction: column;
   padding: 1.5rem 0.75rem;
   gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Custom Scrollbar for Sidebar to look glassy */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .nav-item {

@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authHelpers";
 import prisma from "@/lib/db";
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const userRole = (session?.user as any)?.role;
-    
-    // Security check: only allow Admins to view this
-    if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+    const { userRole } = auth;
 
     const admins = await prisma.user.findMany({
       select: {

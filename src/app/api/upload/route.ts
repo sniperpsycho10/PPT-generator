@@ -1,41 +1,101 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/db";
+import crypto from "crypto";
+import path from "path";
+import fs from "fs/promises";
+import sharp from "sharp";
 
-export async function POST(request: NextRequest) {
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
+
+// Ensure upload directory exists
+async function ensureUploadDir() {
   try {
-    const data = await request.formData();
-    const file: File | null = data.get('file') as unknown as File;
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  } catch (e) {
+    // Ignore error if it exists
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
 
     if (!file) {
-      return NextResponse.json({ success: false, message: 'No file uploaded' }, { status: 400 });
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "File exceeds 5MB limit" }, { status: 400 });
+    }
 
-    // Create unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.name) || '.jpg';
-    const filename = file.name.replace(extension, '') + '-' + uniqueSuffix + extension;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: "Invalid file type. Only images and PDFs are allowed." }, { status: 400 });
+    }
+
+    await ensureUploadDir();
     
-    // Ensure uploads directory exists
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    // Read file buffer
+    const arrayBuffer = await file.arrayBuffer();
+    let buffer = Buffer.from(arrayBuffer);
+    let mimeType = file.type;
+
+    // Optional: Compress image if it's an image type
+    if (file.type.startsWith("image/")) {
+      try {
+        buffer = await sharp(buffer)
+          .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        mimeType = "image/jpeg";
+      } catch (err) {
+        console.warn("Sharp image processing failed, using original buffer", err);
+      }
     }
 
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
-
-    return NextResponse.json({ 
-      success: true, 
-      url: `/uploads/${filename}`
+    // Hash the (potentially processed) buffer for duplicate detection
+    const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+    const existingFile = await prisma.attachment.findUnique({
+      where: { hash }
     });
 
+    if (existingFile) {
+      return NextResponse.json({ success: true, url: existingFile.url });
+    }
+
+    // Save new file
+    const extension = mimeType === "image/jpeg" ? ".jpg" : (mimeType === "application/pdf" ? ".pdf" : path.extname(file.name));
+    const filename = `${hash}${extension}`;
+    const filePath = path.join(UPLOAD_DIR, filename);
+
+    await fs.writeFile(filePath, buffer);
+
+    const url = `/api/files/${hash}`; // Secure API endpoint
+    
+    await prisma.attachment.create({
+      data: {
+        filename,
+        originalName: file.name,
+        mimeType,
+        size: buffer.length,
+        hash,
+        filePath,
+        url
+      }
+    });
+
+    return NextResponse.json({ success: true, url });
   } catch (error) {
-    console.error('Error uploading file:', error);
-    return NextResponse.json({ success: false, message: 'Server error during upload' }, { status: 500 });
+    console.error("Upload error:", error);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }
