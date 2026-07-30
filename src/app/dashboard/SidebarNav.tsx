@@ -17,7 +17,8 @@ import {
   RefreshCw,
   FileArchive,
   BarChart3,
-  TrendingUp
+  TrendingUp,
+  Mail
 } from "lucide-react";
 
 export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
@@ -67,10 +68,7 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
             <Calendar size={18} />
             Cycles
           </Link>
-          <Link href="/dashboard/cycles/recurring" className={getClassName("/dashboard/cycles/recurring")}>
-            <RefreshCw size={18} />
-            Bulk Generate Cycles
-          </Link>
+
           <Link href="/dashboard/workshop" className={getClassName("/dashboard/workshop")}>
             <Presentation size={18} />
             Workshop Mode
@@ -92,6 +90,11 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
             Reporting Analytics
           </Link>
           
+          <Link href="/dashboard/mail" className={getClassName("/dashboard/mail")}>
+            <Mail size={18} />
+            Mail
+          </Link>
+
           <Link href="/dashboard/settings" className={getClassName("/dashboard/settings")}>
             <Settings size={18} />
             Settings
