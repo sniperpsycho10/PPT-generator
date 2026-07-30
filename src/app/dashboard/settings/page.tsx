@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Shield, ShieldAlert, Mail, User, Clock, XCircle, CheckCircle, Trash2 } from "lucide-react";
+import Avatar from "../components/Avatar";
 
 export default function SettingsPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -110,13 +111,11 @@ export default function SettingsPage() {
                     <tr key={user.id} style={{ borderBottom: '1px solid var(--glass-border)' }} className="hover-lift">
                       <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          {user.image ? (
-                            <img src={user.image} alt="Avatar" style={{ width: '36px', height: '36px', borderRadius: '50%' }} />
-                          ) : (
-                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--jspl-blue)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <User size={18} />
-                            </div>
-                          )}
+                          <Avatar 
+                            src={user.image} 
+                            name={user.name || 'User'} 
+                            size={36} 
+                          />
                           <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{user.name || "Unknown User"}</span>
                         </div>
                       </td>

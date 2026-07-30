@@ -370,16 +370,34 @@ export default function WorkshopMode() {
 
   const currentSlide = slides[currentSlideIndex];
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        setCurrentSlideIndex(prev => Math.min(prev + 1, slides.length - 1));
+      } else if (e.key === "ArrowLeft") {
+        setCurrentSlideIndex(prev => Math.max(prev - 1, 0));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [slides.length]);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       if (containerRef.current) {
         containerRef.current.requestFullscreen().catch(err => console.error(err));
-        setIsFullscreen(true);
       }
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
-        setIsFullscreen(false);
       }
     }
   };
@@ -1288,60 +1306,67 @@ export default function WorkshopMode() {
   };
 
   return (
-    <div ref={containerRef} className={`workshop-container ${isFullscreen ? 'fullscreen-mode' : ''}`}>
-      <div className="workshop-header">
-        <h2>Live Workshop Presentation</h2>
-        <div className="flex gap-4 items-center">
-          <select 
-            className="input-field" 
-            style={{ width: '200px', padding: '0.5rem', backgroundColor: 'white', color: '#333' }}
-            value={templateStyle}
-            onChange={(e) => {
-              setTemplateStyle(e.target.value);
-              setUseCustomColors(false);
-            }}
-          >
-            <option value="corporate">Corporate Standard</option>
-            <option value="modern">Modern Translucent</option>
-            <option value="dark">Dark Minimalist</option>
-            <option value="vibrant">Vibrant Gradient</option>
-            <option value="industrial">Industrial Steel</option>
-            <option value="nature">Nature Eco</option>
-            <option value="highContrast">High Contrast (A11y)</option>
-            <option value="oceanic">Oceanic Blue</option>
-            <option value="sunset">Sunset Orange</option>
-            <option value="elegant">Elegant Gold</option>
-            <option value="neon">Neon Cyberpunk</option>
-            <option value="minimalWhite">Minimalist White</option>
-            <option value="royalPurple">Royal Purple</option>
-            <option value="pastel">Pastel Dream</option>
-            <option value="forest">Forest Green</option>
-          </select>
-          <button className="btn" onClick={toggleFullscreen}>
-            {isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-          </button>
-          <button className="btn btn-primary" onClick={handleExport} disabled={isGenerating}>
-            {isGenerating ? 'Generating...' : 'Export to PowerPoint'}
-          </button>
+    <div ref={containerRef} className={`workshop-container ${isFullscreen ? 'fullscreen-mode' : ''}`} style={isFullscreen ? { background: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}}>
+      
+      {!isFullscreen && (
+        <div className="workshop-header">
+          <h2>Live Workshop Presentation</h2>
+          <div className="flex gap-4 items-center">
+            <select 
+              className="input-field" 
+              style={{ width: '200px', padding: '0.5rem', backgroundColor: 'white', color: '#333' }}
+              value={templateStyle}
+              onChange={(e) => {
+                setTemplateStyle(e.target.value);
+                setUseCustomColors(false);
+              }}
+            >
+              <option value="corporate">Corporate Standard</option>
+              <option value="modern">Modern Translucent</option>
+              <option value="dark">Dark Minimalist</option>
+              <option value="vibrant">Vibrant Gradient</option>
+              <option value="industrial">Industrial Steel</option>
+              <option value="nature">Nature Eco</option>
+              <option value="highContrast">High Contrast (A11y)</option>
+              <option value="oceanic">Oceanic Blue</option>
+              <option value="sunset">Sunset Orange</option>
+              <option value="elegant">Elegant Gold</option>
+              <option value="neon">Neon Cyberpunk</option>
+              <option value="minimalWhite">Minimalist White</option>
+              <option value="royalPurple">Royal Purple</option>
+              <option value="pastel">Pastel Dream</option>
+              <option value="forest">Forest Green</option>
+            </select>
+            <button className="btn" onClick={toggleFullscreen}>
+              Enter Fullscreen
+            </button>
+            <button className="btn btn-primary" onClick={handleExport} disabled={isGenerating}>
+              {isGenerating ? 'Generating...' : 'Export to PowerPoint'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="workshop-layout" style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: '100%', maxWidth: '1200px', aspectRatio: '16/9', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #ccc', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <div className="workshop-layout" style={isFullscreen ? { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' } : { display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+        <div style={isFullscreen ? { width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' } : { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0 }}>
+          
+          <div style={isFullscreen ? { width: '100%', height: '100%', maxHeight: '100vh', maxWidth: '177.78vh', aspectRatio: '16/9', backgroundColor: 'white', overflow: 'hidden' } : { width: '100%', maxWidth: '1200px', aspectRatio: '16/9', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #ccc', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
             {renderSlide()}
           </div>
           
-          <div className="presentation-controls" style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <button className="btn" onClick={prevSlide} disabled={currentSlideIndex === 0}>&larr; Previous</button>
-            <span style={{ fontWeight: 'bold' }}>Slide {currentSlideIndex + 1} of {slides.length}</span>
-            <button className="btn" onClick={nextSlide} disabled={currentSlideIndex === slides.length - 1}>Next &rarr;</button>
-          </div>
+          {!isFullscreen && (
+            <div className="presentation-controls" style={{ marginTop: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button className="btn" onClick={prevSlide} disabled={currentSlideIndex === 0}>&larr; Previous</button>
+              <span style={{ fontWeight: 'bold' }}>Slide {currentSlideIndex + 1} of {slides.length}</span>
+              <button className="btn" onClick={nextSlide} disabled={currentSlideIndex === slides.length - 1}>Next &rarr;</button>
+            </div>
+          )}
         </div>
 
         {/* Sidebar for Settings and Ordering */}
-        <div style={{ width: '350px', backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', flexShrink: 0, maxHeight: '80vh', overflowY: 'auto' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.5rem' }}>Admin Settings</h3>
+        {!isFullscreen && (
+          <div style={{ width: '350px', backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', flexShrink: 0, maxHeight: '80vh', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.5rem' }}>Admin Settings</h3>
           
           <div style={{ marginBottom: '2rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
@@ -1377,7 +1402,8 @@ export default function WorkshopMode() {
               </div>
             ))}
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
       {editingSlide && (

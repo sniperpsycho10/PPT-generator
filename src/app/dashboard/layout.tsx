@@ -11,6 +11,7 @@ import SidebarNav from "./SidebarNav";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 import DepartmentSelector from "./DepartmentSelector";
+import Avatar from "./components/Avatar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -70,13 +71,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <NotificationBell />
             <ThemeToggle />
             <div className="profile-pill">
-              {session?.user?.image ? (
-                <img src={session.user.image} alt="Avatar" style={{ width: '38px', height: '38px', borderRadius: '50%', border: '2px solid white' }} />
-              ) : (
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--jspl-blue) 0%, var(--jspl-blue-light) 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem', border: '2px solid white' }}>
-                  {(session?.user?.name || 'A')[0]}
-                </div>
-              )}
+              <Avatar 
+                src={session?.user?.image} 
+                name={session?.user?.name || 'User'} 
+                style={{ border: '2px solid white' }} 
+              />
               <div className="profile-info">
                 <div className="profile-name">{session?.user?.name || 'User'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

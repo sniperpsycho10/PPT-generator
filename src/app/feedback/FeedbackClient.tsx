@@ -98,11 +98,11 @@ export default function FeedbackClient({ loggedInUser, repetitiveProblems }: Pro
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontWeight: '600', fontSize: '0.9rem', color: '#f8fafc' }}>Your Name <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input type="text" name="guestName" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', outline: 'none' }} placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required />
+                  <input type="text" name="guestName" className="feedback-input" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{ fontWeight: '600', fontSize: '0.9rem', color: '#f8fafc' }}>Department <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select name="guestDept" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', outline: 'none' }} value={dept} onChange={e => setDept(e.target.value)} required>
+                  <select name="guestDept" className="feedback-input" value={dept} onChange={e => setDept(e.target.value)} required>
                     <option value="" disabled style={{ color: 'black' }}>Select your department</option>
                     <option value="Blast Furnace" style={{ color: 'black' }}>Blast Furnace</option>
                     <option value="Steel Melting Shop (SMS)" style={{ color: 'black' }}>Steel Melting Shop (SMS)</option>
@@ -125,7 +125,7 @@ export default function FeedbackClient({ loggedInUser, repetitiveProblems }: Pro
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontWeight: '600', fontSize: '0.9rem', color: '#f8fafc' }}>Related Problem (Optional)</label>
-              <select name="submissionId" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', outline: 'none' }} value={submissionId} onChange={e => setSubmissionId(e.target.value)}>
+              <select name="submissionId" className="feedback-input" value={submissionId} onChange={e => setSubmissionId(e.target.value)}>
                 <option value="" style={{ color: 'black' }}>General Suggestion (No specific problem)</option>
                 {repetitiveProblems.map(p => (
                   <option key={p.id} value={p.id} style={{ color: 'black' }}>{p.title}</option>
@@ -135,7 +135,7 @@ export default function FeedbackClient({ loggedInUser, repetitiveProblems }: Pro
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <label style={{ fontWeight: '600', fontSize: '0.9rem', color: '#f8fafc' }}>Suggestion / Insight <span style={{ color: '#ef4444' }}>*</span></label>
-              <textarea name="suggestionText" rows={4} style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'white', outline: 'none', resize: 'vertical' }} placeholder="I suggest we implement..." value={suggestion} onChange={e => setSuggestion(e.target.value)} required />
+              <textarea name="suggestionText" className="feedback-input" rows={4} style={{ resize: 'vertical' }} placeholder="I suggest we implement..." value={suggestion} onChange={e => setSuggestion(e.target.value)} required />
             </div>
             
             <button type="submit" className="login-btn" style={{ marginTop: '0.5rem' }} disabled={loading}>
