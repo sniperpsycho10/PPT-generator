@@ -60,10 +60,13 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     if (oldSub.cycleId) {
       const cycle = await prisma.cycle.findUnique({ where: { id: oldSub.cycleId } });
       if (cycle) {
-        if (!cycle.isActive || (cycle.endDate && new Date() > cycle.endDate)) {
-          if (userRole !== 'SuperAdmin') {
-            return NextResponse.json({ error: "Cannot edit submissions in a locked or ended cycle" }, { status: 403 });
-          }
+        const now = new Date();
+        const start = new Date(cycle.startDate); start.setHours(0,0,0,0);
+        const end = new Date(cycle.endDate); end.setHours(23,59,59,999);
+        const isClosed = !cycle.isActive || now > end || now < start;
+        
+        if (isClosed && userRole !== 'SuperAdmin') {
+          return NextResponse.json({ error: "Cannot edit submissions in a locked, future, or ended cycle" }, { status: 403 });
         }
       }
     }

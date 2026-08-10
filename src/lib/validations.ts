@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const CycleSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  month: z.number().int().min(1).max(12),
-  year: z.number().int().min(2020).max(2100),
+  month: z.union([z.string(), z.number()]).optional().transform(val => val ? String(val) : null),
+  year: z.union([z.string(), z.number()]).optional().transform(val => val ? String(val) : null),
   startDate: z.string().or(z.date()),
   endDate: z.string().or(z.date()),
   isActive: z.boolean().optional(),

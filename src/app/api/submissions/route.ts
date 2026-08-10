@@ -39,14 +39,33 @@ export async function POST(req: Request) {
 
     const cleanData = validatedData.data;
 
-    if (cleanData.cycleId) {
-      const cycle = await prisma.cycle.findUnique({ where: { id: cleanData.cycleId } });
+    let finalCycleId = cleanData.cycleId;
+
+    if (!finalCycleId) {
+      const activeCycle = await prisma.cycle.findFirst({
+        where: { isActive: true, endDate: { gte: new Date() }, startDate: { lte: new Date() } },
+        orderBy: { endDate: 'asc' }
+      });
+      if (activeCycle) {
+        finalCycleId = activeCycle.id;
+      }
+    }
+
+    if (finalCycleId) {
+      const cycle = await prisma.cycle.findUnique({ where: { id: finalCycleId } });
       if (cycle) {
-        if (!cycle.isActive || (cycle.endDate && new Date() > cycle.endDate)) {
-          if (userRole !== 'SuperAdmin') {
-            return NextResponse.json({ error: "Cannot submit to a locked or ended cycle" }, { status: 403 });
-          }
+        const now = new Date();
+        const start = new Date(cycle.startDate); start.setHours(0,0,0,0);
+        const end = new Date(cycle.endDate); end.setHours(23,59,59,999);
+        const isClosed = !cycle.isActive || now > end || now < start;
+        
+        if (isClosed && userRole !== 'SuperAdmin') {
+          return NextResponse.json({ error: "Cannot submit to a locked, future, or ended cycle" }, { status: 403 });
         }
+      }
+    } else {
+      if (userRole !== 'SuperAdmin') {
+        return NextResponse.json({ error: "Cannot submit because no active cycle is currently open" }, { status: 403 });
       }
     }
 
@@ -55,6 +74,7 @@ export async function POST(req: Request) {
         userId: dbUser.id,
         departmentId: dbUser.departmentId,
         ...cleanData,
+        cycleId: finalCycleId || null,
         calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
         impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
         whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,

@@ -16,18 +16,26 @@ const STAGES = [
 ];
 
 const DEPARTMENTS = [
-  "SMS (Steel Melting Shop)",
-  "Blast Furnace",
-  "Coke Ovens",
-  "Rolling Mill",
-  "Sinter Plant",
-  "Power Plant",
-  "Raw Material Handling",
+  "Iron Making (Blast Furnace, Sinter Plant, Coke Oven, Raw Material Handling)",
+  "DRI (Sponge Iron)",
+  "Steel Melting Shop (SMS)",
+  "Rolling Mills (Rail & Universal Beam Mill, Plate Mill, Structural Mill)",
+  "Captive Power Plant (CPP)",
   "Mechanical Maintenance",
   "Electrical Maintenance",
-  "Quality Control",
-  "Safety",
-  "General Administration"
+  "Instrumentation & Automation",
+  "Quality Assurance & Quality Control (QA/QC)",
+  "Production Planning & Control (PPC)",
+  "Projects & Engineering",
+  "Utilities (Oxygen Plant, Water Treatment, Air, Gas, DM Plant)",
+  "Environment Management",
+  "Health, Safety & Fire (HSE)",
+  "Materials / Purchase / Procurement",
+  "Stores & Warehouse",
+  "Logistics & Dispatch",
+  "Finance & Accounts",
+  "Human Resources (HR) & Administration",
+  "Information Technology (IT)"
 ];
 
 interface Props {

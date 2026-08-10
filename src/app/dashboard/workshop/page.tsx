@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { X, Plus, Image as ImageIcon } from "lucide-react";
+import { X, Plus, Image as ImageIcon, ChevronUp, ChevronDown } from "lucide-react";
 import "./workshop.css";
 
 const uploadImage = async (file: File, onProgress?: (pct: number) => void) => {
@@ -208,12 +208,12 @@ function LiveEditModal({ slide, onSave, onClose }: { slide: any, onSave: (s: any
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-      <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', color: '#333' }}>
+      <div style={{ background: 'var(--header-bg)', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', color: 'var(--text-primary)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Live Edit Slide Data</h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}><X size={24} color="#333" /></button>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit' }}><X size={24} /></button>
         </div>
-        <p style={{ marginBottom: '1.5rem', color: '#666', fontSize: '0.9rem' }}>Changes will reflect instantly and will be included in the exported PowerPoint.</p>
+        <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Changes will reflect instantly and will be included in the exported PowerPoint.</p>
         
         <form onSubmit={(e) => { e.preventDefault(); onSave(data); }}>
           {Object.keys(data).map(key => {
@@ -1314,7 +1314,7 @@ export default function WorkshopMode() {
           <div className="flex gap-4 items-center">
             <select 
               className="input-field" 
-              style={{ width: '200px', padding: '0.5rem', backgroundColor: 'white', color: '#333' }}
+              style={{ width: '200px', padding: '0.5rem' }}
               value={templateStyle}
               onChange={(e) => {
                 setTemplateStyle(e.target.value);
@@ -1365,8 +1365,8 @@ export default function WorkshopMode() {
 
         {/* Sidebar for Settings and Ordering */}
         {!isFullscreen && (
-          <div style={{ width: '350px', backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', flexShrink: 0, maxHeight: '80vh', overflowY: 'auto' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.5rem' }}>Admin Settings</h3>
+          <div style={{ width: '350px', backgroundColor: 'var(--header-bg)', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', flexShrink: 0, maxHeight: '80vh', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid var(--glass-border)', paddingBottom: '0.5rem' }}>Admin Settings</h3>
           
           <div style={{ marginBottom: '2rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
@@ -1386,18 +1386,18 @@ export default function WorkshopMode() {
             )}
           </div>
 
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid #f0f0f0', paddingBottom: '0.5rem' }}>Slide Reordering</h3>
-          <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem' }}>Reorder Submissions before generating. (Cover, Agenda, and Trackers are fixed).</p>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', borderBottom: '2px solid var(--glass-border)', paddingBottom: '0.5rem' }}>Slide Reordering</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>Reorder Submissions before generating. (Cover, Agenda, and Trackers are fixed).</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {submissions.map((sub, idx) => (
-              <div key={sub.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '4px', border: '1px solid #ddd' }}>
-                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }} title={sub.title}>
+              <div key={sub.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: 'var(--input-bg)', borderRadius: '4px', border: '1px solid var(--glass-border)', minWidth: 0 }}>
+                <span style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0, paddingRight: '0.5rem' }} title={sub.title}>
                   {sub.type === 'SupportingSlide' ? '📎 ' : (sub.type === 'BestPractice' ? '⭐ ' : '⚠️ ')}
                   {sub.title}
                 </span>
-                <div style={{ display: 'flex', gap: '0.2rem' }}>
-                  <button onClick={() => moveSlide(idx, 'up')} disabled={idx === 0} style={{ padding: '0 0.4rem', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}>↑</button>
-                  <button onClick={() => moveSlide(idx, 'down')} disabled={idx === submissions.length - 1} style={{ padding: '0 0.4rem', cursor: idx === submissions.length - 1 ? 'not-allowed' : 'pointer' }}>↓</button>
+                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); moveSlide(idx, 'up'); }} disabled={idx === 0} className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', opacity: idx === 0 ? 0.5 : 1 }}>▲</button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); moveSlide(idx, 'down'); }} disabled={idx === submissions.length - 1} className="btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', opacity: idx === submissions.length - 1 ? 0.5 : 1 }}>▼</button>
                 </div>
               </div>
             ))}

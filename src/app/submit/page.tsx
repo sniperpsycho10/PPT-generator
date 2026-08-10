@@ -58,20 +58,37 @@ function SubmitPageContent() {
   const [suppImg2, setSuppImg2] = useState<File | null>(null);
   const [suppImg3, setSuppImg3] = useState<File | null>(null);
 
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   useEffect(() => {
     // Prevent hydration mismatch by rendering default states safely
     fetch('/api/cycles')
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          const activeCycles = data.data.filter((c: any) => c.isActive);
+          const now = new Date();
+          const activeCycles = data.data.filter((c: any) => {
+            if (!c.isActive) return false;
+            
+            const startDate = new Date(c.startDate);
+            startDate.setHours(0, 0, 0, 0);
+            
+            const endDate = new Date(c.endDate);
+            endDate.setHours(23, 59, 59, 999);
+            
+            return now >= startDate && now <= endDate;
+          });
           setCycles(activeCycles);
           if (activeCycles.length > 0) {
             setSelectedCycleId(activeCycles[0].id);
           }
         }
+        setDataLoaded(true);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setDataLoaded(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -395,7 +412,16 @@ function SubmitPageContent() {
 
       <input type="file" id="tableImportInput" style={{ display: 'none' }} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileUpload} />
 
-      {isPreviewMode ? (
+      {!dataLoaded ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>Loading...</div>
+      ) : cycles.length === 0 && !editId ? (
+        <div className="preview-container glass" style={{ padding: '4rem 2rem', borderRadius: '12px', textAlign: 'center' }}>
+          <h2 style={{ color: '#e74c3c', marginBottom: '1rem', fontSize: '2rem', fontWeight: 'bold' }}>Submissions Locked</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: '600px', margin: '0 auto', lineHeight: '1.6' }}>
+            There is currently no active cycle open for submissions. Please wait for the management team to open a new submission window.
+          </p>
+        </div>
+      ) : isPreviewMode ? (
         <div className="preview-container glass" style={{ padding: '2rem', borderRadius: '12px' }}>
           <h2 style={{ color: 'var(--jspl-blue)', marginBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.5rem' }}>Submission Preview</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -410,9 +436,13 @@ function SubmitPageContent() {
           </div>
           
           <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center' }}>
-            <button className="btn btn-primary" style={{ padding: '0.8rem 2rem', fontSize: '1.1rem' }} onClick={() => setIsPreviewMode(false)}>
-              Unlock for Editing
-            </button>
+            {cycles.length === 0 ? (
+              <p style={{ color: '#e74c3c', fontWeight: 'bold' }}>This cycle has ended. Editing is disabled.</p>
+            ) : (
+              <button className="btn btn-primary" style={{ padding: '0.8rem 2rem', fontSize: '1.1rem' }} onClick={() => setIsPreviewMode(false)}>
+                Unlock for Editing
+              </button>
+            )}
           </div>
         </div>
       ) : (

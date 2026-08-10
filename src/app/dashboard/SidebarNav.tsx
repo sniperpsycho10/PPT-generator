@@ -77,10 +77,7 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
             <FileText size={18} />
             Generated PPTs
           </Link>
-          <Link href="/dashboard/attachments" className={getClassName("/dashboard/attachments")}>
-            <FileArchive size={18} />
-            Attachments
-          </Link>
+
           <Link href="/dashboard/reports/adoptions" className={getClassName("/dashboard/reports/adoptions")}>
             <BarChart3 size={18} />
             Adoptions Report
