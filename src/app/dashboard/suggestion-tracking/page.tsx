@@ -3,11 +3,11 @@ import prisma from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import TrackingClient from "./TrackingClient";
+import SuggestionTrackingClient from "./SuggestionTrackingClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function TrackingPage() {
+export default async function SuggestionTrackingPage() {
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/auth/signin");
@@ -17,20 +17,23 @@ export default async function TrackingPage() {
   const userId = (session.user as any).id;
   const isAdmin = userRole === 'Admin' || userRole === 'SuperAdmin';
 
-  // We are fetching all Repetitive Problems now.
-  let whereClause: any = { type: "RepetitiveProblem", deletedAt: null };
-
-  const problems = await prisma.submission.findMany({
-    where: whereClause,
+  // Fetch all suggestions with their parent submission and user data
+  const suggestions = await prisma.suggestion.findMany({
+    where: { 
+      status: "Accepted", 
+      submission: { deletedAt: null } 
+    },
     include: {
-      department: true,
-      cycle: true,
-      suggestions: {
+      submission: {
         include: {
-          suggestedBy: true
+          cycle: true
         }
       },
-      user: true,
+      suggestedBy: {
+        include: {
+          department: true
+        }
+      },
       assignedTeam: true,
       progressLog: {
         orderBy: { createdAt: 'desc' }
@@ -49,5 +52,5 @@ export default async function TrackingPage() {
     orderBy: { name: 'asc' }
   });
 
-  return <TrackingClient initialProblems={problems} departments={departments} teams={teams} isAdmin={isAdmin} currentUserId={userId} />;
+  return <SuggestionTrackingClient initialSuggestions={suggestions} departments={departments} teams={teams} isAdmin={isAdmin} currentUserId={userId} />;
 }

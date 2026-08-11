@@ -1,35 +1,34 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { RefreshCw, Download, Search, Paperclip, Trophy, X, Send, Camera, Upload, AlertCircle } from "lucide-react";
+import { RefreshCw, Download, Search, Paperclip, Trophy, X, Send, Camera, Upload, AlertCircle, Filter, ChevronRight, Clock, CheckCircle2, User } from "lucide-react";
 import AssignTeamModal from "../components/AssignTeamModal";
 
 interface Props {
-  initialProblems: any[];
+  initialSuggestions: any[];
   departments: any[];
   teams: any[];
   isAdmin: boolean;
   currentUserId: string;
 }
 
-export default function TrackingClient({ initialProblems, departments, teams, isAdmin, currentUserId }: Props) {
-  const [problems, setProblems] = useState(initialProblems);
+export default function SuggestionTrackingClient({ initialSuggestions, departments, teams, isAdmin, currentUserId }: Props) {
+  const [suggestions, setSuggestions] = useState(initialSuggestions);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMonth, setFilterMonth] = useState("All months");
   const [filterDept, setFilterDept] = useState("All departments");
-  const [filterStatus, setFilterStatus] = useState("All statuses");
-  const [filterSeverity, setFilterSeverity] = useState("All severities");
+  const [filterStage, setFilterStage] = useState("All stages");
   const [filterGiver, setFilterGiver] = useState("All suggestion givers");
 
   // Modal State
-  const [activeProblem, setActiveProblem] = useState<any | null>(null);
-  const [teamModalOpen, setTeamModalOpen] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState<any | null>(null);
   const [assigningTeamId, setAssigningTeamId] = useState("");
   
   // Progress Form State
   const [newProgress, setNewProgress] = useState<number>(0);
   const [newNotes, setNewNotes] = useState("");
   const [newPhotoUrls, setNewPhotoUrls] = useState<string[]>([]);
+  const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [newAttachedFileUrl, setNewAttachedFileUrl] = useState<string | null>(null);
   const [newAttachedFileName, setNewAttachedFileName] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,104 +37,95 @@ export default function TrackingClient({ initialProblems, departments, teams, is
   // Extract unique values for filters
   const uniqueMonths = useMemo(() => {
     const months = new Set<string>();
-    problems.forEach(p => {
-      if (p.cycle?.name) months.add(p.cycle.name);
+    suggestions.forEach(s => {
+      if (s.submission?.cycle?.name) months.add(s.submission.cycle.name);
       else {
-        const d = new Date(p.createdAt);
+        const d = new Date(s.createdAt);
         months.add(`${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`);
       }
     });
     return ["All months", ...Array.from(months).sort()];
-  }, [problems]);
+  }, [suggestions]);
 
   const uniqueDepts = ["All departments", ...departments.map(d => d.name)];
-  const uniqueStatuses = ["All statuses", "Open", "In Progress", "Overdue", "Closed"];
-  const uniqueSeverities = ["All severities", "Low", "Medium", "High", "Critical"];
+  
+  const uniqueStages = [
+    "All stages",
+    "PendingReview", 
+    "FeasibilityAnalysis", 
+    "Procurement", 
+    "ExecutionShutdown", 
+    "ExecutionRunning", 
+    "Testing", 
+    "Standardized", 
+    "Closed"
+  ];
   
   const uniqueGivers = useMemo(() => {
     const givers = new Set<string>();
-    problems.forEach(p => {
-      p.suggestions?.forEach((s: any) => {
-        if (s.suggestedBy?.name) givers.add(s.suggestedBy.name);
-        else if (s.guestName) givers.add(s.guestName);
-      });
+    suggestions.forEach(s => {
+      if (s.suggestedBy?.name) givers.add(s.suggestedBy.name);
+      else if (s.guestName) givers.add(s.guestName);
     });
     return ["All suggestion givers", ...Array.from(givers).sort()];
-  }, [problems]);
+  }, [suggestions]);
 
   // Apply filters
-  const filteredProblems = useMemo(() => {
-    return problems.filter(p => {
-      // 1. Search (ID, Equipment, Problem, Giver)
+  const filteredSuggestions = useMemo(() => {
+    return suggestions.filter(s => {
+      // 1. Search (ID, Problem, Suggestion, Giver)
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        const matchesId = p.trackingId?.toLowerCase().includes(term);
-        const matchesEq = p.equipmentDetails?.toLowerCase().includes(term);
-        const matchesProb = p.problemStatement?.toLowerCase().includes(term);
-        const matchesGiver = p.suggestions?.some((s: any) => 
-          (s.suggestedBy?.name || "").toLowerCase().includes(term) || 
-          (s.guestName || "").toLowerCase().includes(term)
-        );
-        if (!matchesId && !matchesEq && !matchesProb && !matchesGiver) return false;
+        const matchesId = s.id.toLowerCase().includes(term);
+        const matchesSuggText = s.suggestionText?.toLowerCase().includes(term);
+        const matchesProbText = s.submission?.title?.toLowerCase().includes(term);
+        const matchesGiver = (s.suggestedBy?.name || "").toLowerCase().includes(term) || (s.guestName || "").toLowerCase().includes(term);
+        
+        if (!matchesId && !matchesSuggText && !matchesProbText && !matchesGiver) return false;
       }
 
       // 2. Month Filter
       if (filterMonth !== "All months") {
-        const pMonth = p.cycle?.name || `${new Date(p.createdAt).toLocaleString('default', { month: 'short' })} ${new Date(p.createdAt).getFullYear()}`;
-        if (pMonth !== filterMonth) return false;
+        const sMonth = s.submission?.cycle?.name || `${new Date(s.createdAt).toLocaleString('default', { month: 'short' })} ${new Date(s.createdAt).getFullYear()}`;
+        if (sMonth !== filterMonth) return false;
       }
 
       // 3. Department Filter
       if (filterDept !== "All departments") {
-        if (p.department?.name !== filterDept) return false;
+        const deptName = s.suggestedBy?.department?.name || s.guestDept || "Unknown";
+        if (deptName !== filterDept) return false;
       }
 
-      // 4. Status Filter
-      if (filterStatus !== "All statuses") {
-        if (p.trackingStatus !== filterStatus) return false;
+      // 4. Stage Filter
+      if (filterStage !== "All stages") {
+        if (s.implementationStage !== filterStage) return false;
       }
 
-      // 5. Severity Filter
-      if (filterSeverity !== "All severities") {
-        if (p.severity !== filterSeverity) return false;
-      }
-
-      // 6. Giver Filter
+      // 5. Giver Filter
       if (filterGiver !== "All suggestion givers") {
-        const hasGiver = p.suggestions?.some((s: any) => 
-          s.suggestedBy?.name === filterGiver || s.guestName === filterGiver
-        );
-        if (!hasGiver) return false;
+        const giverName = s.suggestedBy?.name || s.guestName || "Anonymous";
+        if (giverName !== filterGiver) return false;
       }
 
       return true;
     });
-  }, [problems, searchTerm, filterMonth, filterDept, filterStatus, filterSeverity, filterGiver]);
+  }, [suggestions, searchTerm, filterMonth, filterDept, filterStage, filterGiver]);
 
   // Calculate KPIs
-  const totalProblems = filteredProblems.length;
-  const openProblems = filteredProblems.filter(p => p.trackingStatus === "Open").length;
-  const overdueProblems = filteredProblems.filter(p => p.trackingStatus === "Overdue").length;
+  const totalSuggestions = filteredSuggestions.length;
+  const pendingSuggestions = filteredSuggestions.filter(s => s.implementationStage === "PendingReview").length;
+  const implementedSuggestions = filteredSuggestions.filter(s => s.implementationStage === "Standardized" || s.implementationStage === "Closed").length;
   
-  let totalSuggestions = 0;
-  let implementedSuggestions = 0;
   let totalProgress = 0;
-
   const giverCounts: Record<string, number> = {};
 
-  filteredProblems.forEach(p => {
-    totalProgress += (p.progress || 0);
-    p.suggestions?.forEach((s: any) => {
-      totalSuggestions++;
-      if (s.implementationStage === 'Standardized' || s.implementationStage === 'Closed') {
-        implementedSuggestions++;
-      }
-      const giverName = s.suggestedBy?.name || s.guestName || "Anonymous";
-      giverCounts[giverName] = (giverCounts[giverName] || 0) + 1;
-    });
+  filteredSuggestions.forEach(s => {
+    totalProgress += (s.currentProgress || 0);
+    const giverName = s.suggestedBy?.name || s.guestName || "Anonymous";
+    giverCounts[giverName] = (giverCounts[giverName] || 0) + 1;
   });
 
-  const avgProgress = totalProblems > 0 ? Math.round(totalProgress / totalProblems) : 0;
+  const avgProgress = totalSuggestions > 0 ? Math.round(totalProgress / totalSuggestions) : 0;
   
   // Find top giver
   let topGiver = { name: "-", count: 0 };
@@ -149,31 +139,26 @@ export default function TrackingClient({ initialProblems, departments, teams, is
     setSearchTerm("");
     setFilterMonth("All months");
     setFilterDept("All departments");
-    setFilterStatus("All statuses");
-    setFilterSeverity("All severities");
+    setFilterStage("All stages");
     setFilterGiver("All suggestion givers");
   };
 
   const exportCSV = () => {
-    const headers = ["ID", "MONTH", "DEPARTMENT", "EQUIPMENT", "PROBLEM", "SEVERITY", "STATUS", "PROGRESS (%)", "TOTAL SUGGESTIONS", "IMPLEMENTED", "GIVERS"];
-    const rows = filteredProblems.map(p => {
-      const givers = Array.from(new Set(p.suggestions?.map((s:any) => s.suggestedBy?.name || s.guestName || "Anonymous"))).join(", ");
-      const totalSugs = p.suggestions?.length || 0;
-      const implSugs = p.suggestions?.filter((s:any) => s.implementationStage === 'Standardized' || s.implementationStage === 'Closed').length || 0;
-      const monthStr = p.cycle?.name || `${new Date(p.createdAt).toLocaleString('default', { month: 'short' })} ${new Date(p.createdAt).getFullYear()}`;
+    const headers = ["ID", "MONTH", "DEPARTMENT", "PROBLEM TITLE", "SUGGESTION TEXT", "STAGE", "PROGRESS (%)", "GIVER"];
+    const rows = filteredSuggestions.map(s => {
+      const giver = s.suggestedBy?.name || s.guestName || "Anonymous";
+      const deptName = s.suggestedBy?.department?.name || s.guestDept || "Unknown";
+      const monthStr = s.submission?.cycle?.name || `${new Date(s.createdAt).toLocaleString('default', { month: 'short' })} ${new Date(s.createdAt).getFullYear()}`;
       
       return [
-        p.trackingId || "-",
+        `S-${s.id.substring(0,6).toUpperCase()}`,
         monthStr,
-        p.department?.name || "-",
-        (p.equipmentDetails || "").replace(/"/g, '""'),
-        (p.problemStatement || "").replace(/"/g, '""'),
-        p.severity || "-",
-        p.trackingStatus || "-",
-        p.progress || 0,
-        totalSugs,
-        implSugs,
-        `"${givers}"`
+        deptName,
+        (s.submission?.title || "Direct Suggestion").replace(/"/g, '""'),
+        (s.suggestionText || "").replace(/"/g, '""'),
+        s.implementationStage || "PendingReview",
+        s.currentProgress || 0,
+        `"${giver}"`
       ].join(",");
     });
 
@@ -181,31 +166,16 @@ export default function TrackingClient({ initialProblems, departments, teams, is
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Repetitive_Problems_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Suggestion_Tracking_Export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const getSeverityColor = (sev: string) => {
-    if (sev === "Critical") return "#e74c3c";
-    if (sev === "High") return "#d35400";
-    if (sev === "Medium") return "#f39c12";
-    if (sev === "Low") return "#27ae60";
-    return "var(--text-main)";
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === "Overdue") return "#e74c3c";
-    if (status === "Open") return "var(--text-main)";
-    if (status === "In Progress") return "var(--text-secondary)";
-    return "var(--text-main)";
-  };
-
-  const handleRowClick = (p: any) => {
-    setActiveProblem(p);
-    setAssigningTeamId(p.assignedTeamId || "");
-    setNewProgress(p.progress || 0);
+  const handleRowClick = (s: any) => {
+    setActiveSuggestion(s);
+    setAssigningTeamId(s.assignedTeamId || "");
+    setNewProgress(s.currentProgress || 0);
     setNewNotes("");
     setNewPhotoUrls([]);
     setNewAttachedFileUrl(null);
@@ -213,19 +183,18 @@ export default function TrackingClient({ initialProblems, departments, teams, is
   };
 
   const handleAssignTeam = async () => {
-    if (!activeProblem) return;
+    if (!activeSuggestion) return;
     try {
-      const res = await fetch(`/api/submissions/${activeProblem.id}`, {
+      const res = await fetch(`/api/suggestions/${activeSuggestion.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assignedTeamId: assigningTeamId })
       });
       if (res.ok) {
         const data = await res.json();
-        // Since we don't get the full populated object back easily from the PUT without complex includes, we will manually update state.
-        const updated = problems.map(p => p.id === activeProblem.id ? { ...p, assignedTeamId: assigningTeamId, assignedTeam: teams.find(t => t.id === assigningTeamId) } : p);
-        setProblems(updated);
-        setActiveProblem(updated.find(p => p.id === activeProblem.id));
+        const updated = suggestions.map(s => s.id === data.data.id ? { ...s, assignedTeamId: data.data.assignedTeamId, assignedTeam: teams.find(t => t.id === data.data.assignedTeamId) } : s);
+        setSuggestions(updated);
+        setActiveSuggestion(updated.find(s => s.id === activeSuggestion.id));
         alert("Team assigned successfully");
       } else {
         alert("Failed to assign team");
@@ -265,10 +234,10 @@ export default function TrackingClient({ initialProblems, departments, teams, is
   };
 
   const handleUpdateProgress = async () => {
-    if (!activeProblem) return;
+    if (!activeSuggestion) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/submissions/${activeProblem.id}/progress`, {
+      const res = await fetch(`/api/suggestions/${activeSuggestion.id}/progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -281,10 +250,9 @@ export default function TrackingClient({ initialProblems, departments, teams, is
       });
       if (res.ok) {
         const data = await res.json();
-        // Re-merge suggestions so we don't lose them (since progress api might not include suggestions)
-        const updated = problems.map(p => p.id === data.data.id ? { ...data.data, suggestions: p.suggestions } : p);
-        setProblems(updated);
-        setActiveProblem(updated.find(p => p.id === activeProblem.id));
+        const updated = suggestions.map(s => s.id === data.data.id ? data.data : s);
+        setSuggestions(updated);
+        setActiveSuggestion(data.data);
         setNewNotes("");
         setNewPhotoUrls([]);
         setNewAttachedFileUrl(null);
@@ -299,7 +267,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
     setIsSubmitting(false);
   };
 
-  const isAssignedMember = activeProblem?.assignedTeam?.members?.some((m: any) => m.id === currentUserId) || isAdmin;
+  const isAssignedMember = activeSuggestion?.assignedTeam?.members?.some((m: any) => m.id === currentUserId) || isAdmin;
 
   return (
     <div style={{ backgroundColor: '#f4f7f6', minHeight: '100vh', margin: '-2rem', padding: '2rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -307,7 +275,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
       {/* HEADER BAR */}
       <div style={{ backgroundColor: '#0f6250', color: 'white', padding: '1.5rem 2rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>Repetitive Problem Tracker</h1>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>Suggestion Tracker</h1>
           <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.8, marginTop: '0.2rem' }}>Last refreshed: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
         <button className="btn" style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '4px' }} onClick={() => window.location.reload()}>
@@ -325,12 +293,8 @@ export default function TrackingClient({ initialProblems, departments, teams, is
           {uniqueDepts.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
 
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', flex: '1 1 120px' }}>
-          {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-
-        <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', flex: '1 1 120px' }}>
-          {uniqueSeverities.map(s => <option key={s} value={s}>{s}</option>)}
+        <select value={filterStage} onChange={e => setFilterStage(e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', flex: '1 1 150px' }}>
+          {uniqueStages.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
 
         <select value={filterGiver} onChange={e => setFilterGiver(e.target.value)} style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: 'white', flex: '1 1 150px' }}>
@@ -341,7 +305,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
           <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: '#999' }} />
           <input 
             type="text" 
-            placeholder="Search ID, equipment, problem, person..." 
+            placeholder="Search ID, suggestion, problem, person..." 
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             style={{ width: '100%', padding: '0.5rem 0.5rem 0.5rem 2rem', borderRadius: '4px', border: '1px solid #ccc' }}
@@ -355,38 +319,31 @@ export default function TrackingClient({ initialProblems, departments, teams, is
       {/* KPI CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         
-        {/* KPI: Total Problems */}
+        {/* KPI: Total Suggestions */}
         <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{totalProblems}</div>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Total Problems</div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{totalSuggestions}</div>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Total Suggestions</div>
           <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(15,98,80,0.05)' }}></div>
         </div>
 
-        {/* KPI: Open Problems */}
+        {/* KPI: Pending */}
         <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{openProblems}</div>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Open</div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{pendingSuggestions}</div>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Pending Review</div>
           <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(15,98,80,0.05)' }}></div>
         </div>
 
-        {/* KPI: Overdue Problems */}
+        {/* KPI: Implemented */}
         <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#e74c3c', lineHeight: 1 }}>{overdueProblems}</div>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Overdue</div>
-          <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(231,76,60,0.05)' }}></div>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{implementedSuggestions}</div>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Implemented</div>
+          <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(15,98,80,0.05)' }}></div>
         </div>
 
         {/* KPI: Avg Progress */}
         <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{avgProgress}%</div>
           <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Avg Progress</div>
-          <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(15,98,80,0.05)' }}></div>
-        </div>
-
-        {/* KPI: Suggestions */}
-        <div style={{ backgroundColor: 'white', padding: '1rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#333', lineHeight: 1 }}>{totalSuggestions}</div>
-          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>Suggestions ({implementedSuggestions} Impl)</div>
           <div style={{ position: 'absolute', bottom: '-20px', right: '-20px', width: '70px', height: '70px', borderRadius: '50%', backgroundColor: 'rgba(15,98,80,0.05)' }}></div>
         </div>
 
@@ -408,31 +365,33 @@ export default function TrackingClient({ initialProblems, departments, teams, is
       {/* MAIN TABLE */}
       <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: '1px solid #eaeaea', backgroundColor: '#fafbfc' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#333' }}>Repetitive Problems — click any row to track progress</div>
-          <div style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>{filteredProblems.length} shown</div>
+          <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#333' }}>Suggestions — click any row to track progress</div>
+          <div style={{ fontSize: '0.85rem', color: '#666', fontWeight: 'bold' }}>{filteredSuggestions.length} shown</div>
         </div>
         
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ color: '#888', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.5px' }}>
-                <th style={{ padding: '1rem', fontWeight: 'bold' }}>Tracking ID</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold' }}>Month</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold' }}>Department</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold', width: '25%' }}>Equipment & Problem</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold' }}>Severity</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold' }}>Status</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold', width: '120px' }}>Progress</th>
-                <th style={{ padding: '1rem', fontWeight: 'bold', textAlign: 'center' }}>Sugs</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold' }}>ID</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold' }}>MONTH</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold' }}>DEPARTMENT</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold' }}>PROBLEM TITLE</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold', width: '25%' }}>SUGGESTION TEXT</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold' }}>STAGE</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold', width: '100px' }}>PROGRESS</th>
+                <th style={{ padding: '1rem', fontWeight: 'bold' }}>GIVER</th>
               </tr>
             </thead>
             <tbody>
-              {filteredProblems.map((p, idx) => {
-                const monthStr = p.cycle?.name || `${new Date(p.createdAt).toLocaleString('default', { month: 'short' })} ${new Date(p.createdAt).getFullYear()}`;
+              {filteredSuggestions.map((s, idx) => {
+                const monthStr = s.submission?.cycle?.name || `${new Date(s.createdAt).toLocaleString('default', { month: 'short' })} ${new Date(s.createdAt).getFullYear()}`;
+                const giver = s.suggestedBy?.name || s.guestName || "Anonymous";
+                const deptName = s.suggestedBy?.department?.name || s.guestDept || "Unknown";
 
                 return (
                   <tr 
-                    key={p.id} 
+                    key={s.id} 
                     style={{ 
                       borderBottom: '1px solid #eaeaea', 
                       backgroundColor: idx % 2 === 0 ? '#fff' : '#fafafa',
@@ -441,36 +400,33 @@ export default function TrackingClient({ initialProblems, departments, teams, is
                     }}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f0f7f5'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#fff' : '#fafafa'}
-                    onClick={() => handleRowClick(p)}
+                    onClick={() => handleRowClick(s)}
                   >
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: '#0f6250', whiteSpace: 'nowrap' }}>{p.trackingId || "-"}</td>
+                    <td style={{ padding: '1rem', fontWeight: 'bold', color: '#333', whiteSpace: 'nowrap' }}>S-{s.id.substring(0,6).toUpperCase()}</td>
                     <td style={{ padding: '1rem', color: '#555', whiteSpace: 'nowrap' }}>{monthStr}</td>
-                    <td style={{ padding: '1rem', color: '#555', whiteSpace: 'nowrap' }}>{p.department?.name || "-"}</td>
-                    <td style={{ padding: '1rem', color: '#333', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.equipmentDetails || "General"}</div>
-                      <div style={{ color: '#666', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.problemStatement || p.title}</div>
+                    <td style={{ padding: '1rem', color: '#555', whiteSpace: 'nowrap' }}>{deptName}</td>
+                    <td style={{ padding: '1rem', color: '#333', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ fontWeight: 'bold' }}>{s.submission?.title || "Direct Suggestion"}</span>
                     </td>
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: getSeverityColor(p.severity) }}>{p.severity || "Medium"}</td>
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: getStatusColor(p.trackingStatus) }}>{p.trackingStatus || "Open"}</td>
+                    <td style={{ padding: '1rem', color: '#555', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.suggestionText}</td>
+                    <td style={{ padding: '1rem', fontWeight: 'bold', color: '#0f6250' }}>{s.implementationStage?.replace(/([A-Z])/g, ' $1').trim() || "Pending Review"}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.75rem', color: '#555' }}>
-                        <span>{p.progress || 0}%</span>
+                        <span>{s.currentProgress || 0}%</span>
                       </div>
                       <div style={{ width: '100%', height: '4px', backgroundColor: '#e0e0e0', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{ width: `${p.progress || 0}%`, height: '100%', backgroundColor: '#0f6250' }}></div>
+                        <div style={{ width: `${s.currentProgress || 0}%`, height: '100%', backgroundColor: '#0f6250' }}></div>
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center', fontWeight: 'bold', color: p.suggestions?.length ? '#0f6250' : '#ccc' }}>
-                      {p.suggestions?.length || 0}
-                    </td>
+                    <td style={{ padding: '1rem', color: '#555', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{giver}</td>
                   </tr>
                 );
               })}
               
-              {filteredProblems.length === 0 && (
+              {filteredSuggestions.length === 0 && (
                 <tr>
                   <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#999' }}>
-                    No problems match your filters.
+                    No suggestions match your filters.
                   </td>
                 </tr>
               )}
@@ -480,19 +436,21 @@ export default function TrackingClient({ initialProblems, departments, teams, is
       </div>
 
       {/* EXECUTION TRACKING MODAL */}
-      {activeProblem && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }} onClick={() => setActiveProblem(null)}>
+      {activeSuggestion && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }} onClick={() => setActiveSuggestion(null)}>
           <div style={{ width: '600px', maxWidth: '90vw', height: '100%', backgroundColor: '#f8fafc', boxShadow: '-5px 0 25px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }} onClick={e => e.stopPropagation()}>
             
             {/* Modal Header */}
             <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.25rem' }}>Execution Tracking</div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f6250', fontWeight: 700 }}>{activeProblem.trackingId || `P-${activeProblem.id.substring(0,6)}`}</h2>
-                <div style={{ fontSize: '0.9rem', color: '#334155', marginTop: '0.5rem' }}>{activeProblem.equipmentDetails} - {activeProblem.problemStatement || activeProblem.title}</div>
-                <a href={`/dashboard/submissions/${activeProblem.id}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#3b82f6', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>View Full Problem Details →</a>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f6250', fontWeight: 700 }}>S-{activeSuggestion.id.substring(0,6).toUpperCase()}</h2>
+                <div style={{ fontSize: '0.9rem', color: '#334155', marginTop: '0.5rem' }}>{activeSuggestion.suggestionText}</div>
+                {activeSuggestion.submissionId && (
+                  <a href={`/dashboard/submissions/${activeSuggestion.submissionId}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: '#3b82f6', textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>View Parent Problem →</a>
+                )}
               </div>
-              <button onClick={() => setActiveProblem(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem', color: '#64748b' }}>
+              <button onClick={() => setActiveSuggestion(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem', color: '#64748b' }}>
                 <X size={20} />
               </button>
             </div>
@@ -514,8 +472,8 @@ export default function TrackingClient({ initialProblems, departments, teams, is
                   )}
                 </div>
                 <div style={{ fontSize: '0.95rem', color: '#475569' }}>
-                  {activeProblem.assignedTeam?.name ? (
-                    <strong>Assigned Team: {activeProblem.assignedTeam.name}</strong>
+                  {activeSuggestion.assignedTeam?.name ? (
+                    <strong>Assigned Team: {activeSuggestion.assignedTeam.name}</strong>
                   ) : (
                     "No team assigned yet."
                   )}
@@ -596,7 +554,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
               <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1rem', color: '#1e293b' }}>Timeline History</h3>
                 
-                {!activeProblem.progressLog || activeProblem.progressLog.length === 0 ? (
+                {!activeSuggestion.progressLog || activeSuggestion.progressLog.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 0' }}>
                     <AlertCircle size={32} style={{ margin: '0 auto 1rem auto', opacity: 0.5 }} />
                     <p style={{ margin: 0 }}>No progress updates logged yet.</p>
@@ -605,7 +563,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative' }}>
                     <div style={{ position: 'absolute', left: '11px', top: '24px', bottom: '24px', width: '2px', backgroundColor: '#e2e8f0', zIndex: 1 }}></div>
                     
-                    {activeProblem.progressLog.map((log: any) => (
+                    {activeSuggestion.progressLog.map((log: any) => (
                       <div key={log.id} style={{ display: 'flex', gap: '1rem', position: 'relative', zIndex: 2 }}>
                         <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#0f6250', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 'bold', flexShrink: 0, marginTop: '2px' }}>
                           ✓
@@ -649,12 +607,12 @@ export default function TrackingClient({ initialProblems, departments, teams, is
       )}
 
       {/* Assign Team Modal */}
-      {activeProblem && (
+      {activeSuggestion && (
         <AssignTeamModal 
           isOpen={teamModalOpen}
           onClose={() => setTeamModalOpen(false)}
           onAssignExisting={async (teamId) => {
-            const res = await fetch(`/api/submissions/${activeProblem.id}`, {
+            const res = await fetch(`/api/suggestions/${activeSuggestion.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ assignedTeamId: teamId })
@@ -675,7 +633,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
             const teamData = await resTeam.json();
             if (!resTeam.ok) throw new Error(teamData.error || "Failed to create team");
             
-            const resAssign = await fetch(`/api/submissions/${activeProblem.id}`, {
+            const resAssign = await fetch(`/api/suggestions/${activeSuggestion.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ assignedTeamId: teamData.data.id })
@@ -687,7 +645,7 @@ export default function TrackingClient({ initialProblems, departments, teams, is
               throw new Error("Failed to assign team");
             }
           }}
-          currentTeamId={activeProblem.assignedTeamId}
+          currentTeamId={activeSuggestion.assignedTeamId}
         />
       )}
 

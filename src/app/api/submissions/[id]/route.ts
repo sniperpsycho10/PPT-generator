@@ -107,9 +107,27 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         supportingSlideType: data.supportingSlideType,
         customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
         supportingImages: data.supportingImages || [],
-        cycleId: data.cycleId || null
+        cycleId: data.cycleId || null,
+        assignedTeamId: data.assignedTeamId !== undefined ? data.assignedTeamId : oldSub.assignedTeamId
       }
     });
+
+    if (data.assignedTeamId && data.assignedTeamId !== oldSub.assignedTeamId) {
+      const team = await prisma.team.findUnique({
+        where: { id: data.assignedTeamId },
+        include: { members: true }
+      });
+      if (team && team.members.length > 0) {
+        await prisma.notification.createMany({
+          data: team.members.map((m: any) => ({
+            userId: m.id,
+            title: "New Assignment",
+            message: `Your team (${team.name}) has been assigned to Repetitive Problem: ${updatedSub.trackingId || updatedSub.title}`,
+            link: "/dashboard/tracking"
+          }))
+        });
+      }
+    }
 
     // Save Version History
     const maxVersion = await prisma.submissionVersion.findFirst({ 

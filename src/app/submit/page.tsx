@@ -37,8 +37,12 @@ function SubmitPageContent() {
   // Problem fields
   const [equipmentDetails, setEquipmentDetails] = useState("");
   const [problemStatement, setProblemStatement] = useState("");
+  const [severity, setSeverity] = useState("Medium");
   const [whyWhyAnalysis, setWhyWhyAnalysis] = useState([""]);
-  const [impactCalculation, setImpactCalculation] = useState<any[]>(() => [["Parameter (e.g. Tripping Freq)", "Value", "Calculation"], ["", "", ""]]);
+  const [impactCalculation, setImpactCalculation] = useState<string[][]>([
+    ["Area", "Production parameter", "Loss Details", "Cost Per Unit", "Cost associated"],
+    ["", "", "", "", ""]
+  ]);
   const [actionTakenTable, setActionTakenTable] = useState<any[]>(() => [["Action Taken / Planned", "Target (e.g. Shutdown)", "Status"], ["", "", ""]]);
   
   // Supporting Slide fields
@@ -312,7 +316,7 @@ function SubmitPageContent() {
           description: pendingSubmissionType === "BestPractice" ? methodology : problemStatement,
           status: submitStatus,
           objective, problemAddressed, methodology, impactSavings: parseFloat(impactSavings) || 0, calculationTable: JSON.stringify(calculationTable),
-          equipmentDetails, problemStatement, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
+          equipmentDetails, problemStatement, severity, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
           supportingSlideType: pendingSubmissionType, customTable: "[]", supportingImages: [],
           cycleId: selectedCycleId || null
         };
@@ -351,7 +355,7 @@ function SubmitPageContent() {
           description: activeTab === "best-practice" ? methodology : (activeTab === "problem" ? problemStatement : "Supporting slide"),
           status: submitStatus,
           objective, problemAddressed, methodology, impactSavings: parseFloat(impactSavings) || 0, calculationTable: JSON.stringify(calculationTable),
-          equipmentDetails, problemStatement, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
+          equipmentDetails, problemStatement, severity: activeTab === "problem" ? severity : undefined, whyWhyAnalysis: JSON.stringify(whyWhyAnalysis), impactCalculation: JSON.stringify(impactCalculation), actionTakenTable: JSON.stringify(actionTakenTable),
           supportingSlideType, customTable: JSON.stringify(customTable), supportingImages: [],
           cycleId: selectedCycleId || null
         };
@@ -591,6 +595,15 @@ function SubmitPageContent() {
             <div className="form-group">
               <label>Problem Statement <span style={{color: 'red'}}>*</span></label>
               <textarea className="input-field" rows={3} value={problemStatement} onChange={(e)=>setProblemStatement(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Severity <span style={{color: 'red'}}>*</span></label>
+              <select className="input-field" value={severity} onChange={(e)=>setSeverity(e.target.value)} required>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
             </div>
 
             <label className="section-label">Impact Calculation <span style={{color: 'red'}}>*</span></label>

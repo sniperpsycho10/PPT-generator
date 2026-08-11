@@ -173,6 +173,15 @@ model Submission {
   customTable         Json?
   supportingImages    String[]
 
+  // Tracking Fields for Repetitive Problem Tracker
+  trackingId    String? @unique
+  severity      String? @default("Medium")
+  trackingStatus String? @default("Open")
+  progress      Int     @default(0)
+  assignedTeamId String?
+  assignedTeam  Team?   @relation("TeamSubmissions", fields: [assignedTeamId], references: [id])
+  progressLog   ProblemProgress[]
+
   // Cycle Linking
   cycleId String?
   cycle   Cycle?  @relation(fields: [cycleId], references: [id])
@@ -267,8 +276,22 @@ model Team {
   name        String       @unique
   members     User[]       @relation("TeamMembers")
   suggestions Suggestion[] @relation("TeamSuggestions")
+  problemSubmissions Submission[] @relation("TeamSubmissions")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+}
+
+model ProblemProgress {
+  id               String     @id @default(uuid())
+  submissionId     String
+  submission       Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  progress         Int
+  notes            String?
+  photoUrls        String[]
+  attachedFileUrl  String?
+  attachedFileName String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 model SuggestionProgress {

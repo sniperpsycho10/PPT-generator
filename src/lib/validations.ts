@@ -46,5 +46,7 @@ export const SubmissionSchema = z.object({
   customTable: z.any().optional(),
   supportingImages: z.array(z.string()).optional(),
   
+  severity: z.string().optional(),
+  
   cycleId: z.string().nullable().optional(),
 });

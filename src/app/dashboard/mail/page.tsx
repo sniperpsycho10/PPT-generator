@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Mail, Loader2, Users, Send, AlertTriangle, Search, ChevronDown, Check, X } from "lucide-react";
+import { Mail, Loader2, Users, Send, AlertTriangle, Search, ChevronDown, Check, X, FileText, MessageSquare } from "lucide-react";
 
 function MultiSelectDropdown({ options, selected, onChange, placeholder }: any) {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,7 +19,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }: any) 
   }, []);
 
   const filteredOptions = options.filter((o: any) => {
-    const searchString = `${o.label} ${o.department}`.toLowerCase();
+    const searchString = `${o.label} ${o.subLabel || ''}`.toLowerCase();
     return searchString.includes(query.toLowerCase());
   });
 
@@ -63,7 +63,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }: any) 
           <div style={{ padding: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>
             <input 
               type="text" 
-              placeholder="Search by name, email, or department..." 
+              placeholder="Search..." 
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', outline: 'none', background: '#f8fafc', borderRadius: '6px' }}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -71,7 +71,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }: any) 
             />
           </div>
           <div style={{ overflowY: 'auto', flex: 1, padding: '0.5rem' }}>
-            {filteredOptions.length === 0 && <div style={{ padding: '1rem', color: '#94a3b8', textAlign: 'center' }}>No users found</div>}
+            {filteredOptions.length === 0 && <div style={{ padding: '1rem', color: '#94a3b8', textAlign: 'center' }}>No results found</div>}
             {filteredOptions.map((o: any) => {
               const isSelected = selected.includes(o.value);
               return (
@@ -85,7 +85,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }: any) 
                 >
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ color: '#334155', fontWeight: isSelected ? '600' : '500' }}>{o.label}</span>
-                    {o.department && <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{o.department}</span>}
+                    {o.subLabel && <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{o.subLabel}</span>}
                   </div>
                   {isSelected && <Check size={16} color="#4f46e5" />}
                 </div>
@@ -101,11 +101,19 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }: any) 
 export default function MailPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [users, setUsers] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [problems, setProblems] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [toUsers, setToUsers] = useState<string[]>([]);
   const [ccUsers, setCcUsers] = useState<string[]>([]);
   const [bccUsers, setBccUsers] = useState<string[]>([]);
+  
+  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  
+  const [linkedProblem, setLinkedProblem] = useState<string>("");
+  const [linkedSuggestion, setLinkedSuggestion] = useState<string>("");
   
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -120,37 +128,92 @@ export default function MailPage() {
       })
       .catch(console.error);
 
-    fetch("/api/users")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.users) {
-          // Filter out users without emails
-          setUsers(data.users.filter((u: any) => !!u.email));
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    Promise.all([
+      fetch("/api/users").then(res => res.json()),
+      fetch("/api/teams").then(res => res.json()).catch(() => ({ data: [] })),
+      fetch("/api/submissions").then(res => res.json()),
+      fetch("/api/suggestions").then(res => res.json())
+    ]).then(([usersData, teamsData, problemsData, suggestionsData]) => {
+      if (usersData.users) setUsers(usersData.users.filter((u: any) => !!u.email));
+      if (teamsData.data) setTeams(teamsData.data);
+      if (problemsData.submissions) {
+        setProblems(problemsData.submissions.filter((p: any) => p.type === 'RepetitiveProblem'));
+      }
+      if (suggestionsData.suggestions) setSuggestions(suggestionsData.suggestions);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
   }, []);
 
-  // Prepare options for multi-select (excluding current user)
   const userOptions = users
     .filter(u => u.email !== sessionEmail)
     .map(u => ({
       value: u.email,
       nameOnly: u.name || 'Unknown',
       label: `${u.name || 'Unknown'} - ${u.email}`,
-      department: u.department?.name || ''
+      subLabel: u.department?.name || ''
     }));
 
-  // Combine all recipients to ensure the total number of emails per link never exceeds BATCH_SIZE
+  const teamOptions = teams.map(t => ({
+    value: t.id,
+    nameOnly: t.name,
+    label: t.name,
+    subLabel: `${t.members?.length || 0} members`
+  }));
+
+  const problemOptions = problems.map(p => ({
+    value: p.id,
+    nameOnly: p.trackingId || `P-${p.id.substring(0,6)}`,
+    label: p.trackingId || `P-${p.id.substring(0,6)}`,
+    subLabel: p.equipmentDetails ? `${p.equipmentDetails} - ${p.problemStatement || p.title}` : p.title
+  }));
+  
+  const suggestionOptions = suggestions.map(s => ({
+    value: s.id,
+    nameOnly: `S-${s.id.substring(0,6).toUpperCase()}`,
+    label: `S-${s.id.substring(0,6).toUpperCase()}`,
+    subLabel: s.suggestionText
+  }));
+
+  const injectLink = (type: 'problem' | 'suggestion', id: string) => {
+    if (!id) return;
+    
+    let linkText = "";
+    if (type === 'problem') {
+      const p = problems.find(prob => prob.id === id);
+      if (p) {
+        const fullUrl = `${window.location.origin}/dashboard/submissions/${p.id}`;
+        linkText = `\\n\\n---\\nRelated Problem: [${p.trackingId || p.title}]\\nLink: ${fullUrl}\\n---`;
+      }
+    } else if (type === 'suggestion') {
+      const s = suggestions.find(sug => sug.id === id);
+      if (s) {
+        const fullUrl = `${window.location.origin}/dashboard/submissions/${s.submissionId || ''}`;
+        linkText = `\\n\\n---\\nRelated Suggestion: [S-${s.id.substring(0,6).toUpperCase()}]\\nLink: ${fullUrl}\\n---`;
+      }
+    }
+    
+    setBody(prev => prev + linkText);
+  };
+
   const allRecipients = [
     ...toUsers.map(email => ({ type: 'to', email })),
     ...ccUsers.map(email => ({ type: 'cc', email })),
     ...bccUsers.map(email => ({ type: 'bcc', email }))
   ];
+
+  selectedTeams.forEach(teamId => {
+    const team = teams.find(t => t.id === teamId);
+    if (team?.members) {
+      team.members.forEach((m: any) => {
+        if (m.email && m.email !== sessionEmail && !allRecipients.find(r => r.email === m.email)) {
+          allRecipients.push({ type: 'to', email: m.email });
+        }
+      });
+    }
+  });
 
   const BATCH_SIZE = 50;
   const batches: any[] = [];
@@ -185,7 +248,7 @@ export default function MailPage() {
     document.body.removeChild(a);
   };
 
-  const totalRecipients = toUsers.length + ccUsers.length + bccUsers.length;
+  const totalRecipients = allRecipients.length;
 
   return (
     <div className="animate-fade-in" style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
@@ -198,144 +261,153 @@ export default function MailPage() {
             Mail Client
           </h1>
           <p style={{ color: '#64748b', fontSize: '1.1rem', margin: 0 }}>
-            Generate native email broadcasts safely via your default email client.
+            Compose messages and dispatch them via your native email app
           </p>
         </div>
       </div>
 
-      <div style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '2.5rem', boxShadow: '0 12px 40px rgba(0,0,0,0.06)' }}>
-        
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
-            <Loader2 className="animate-spin text-indigo-500" size={32} />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem', color: '#64748b' }}>
+          <Loader2 size={32} className="spin" style={{ marginBottom: '1rem' }} />
+          <p>Loading address book...</p>
+        </div>
+      ) : (
+        <div style={{ background: 'white', borderRadius: '24px', padding: '2rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)', border: '1px solid #f1f5f9' }}>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', alignItems: 'start' }}>
+              <label style={{ paddingTop: '1rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users size={16} /> To Users
+              </label>
+              <MultiSelectDropdown options={userOptions} selected={toUsers} onChange={setToUsers} placeholder="Select recipients..." />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', alignItems: 'start' }}>
+              <label style={{ paddingTop: '1rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users size={16} /> To Teams
+              </label>
+              <MultiSelectDropdown options={teamOptions} selected={selectedTeams} onChange={setSelectedTeams} placeholder="Select teams..." />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', alignItems: 'start' }}>
+              <label style={{ paddingTop: '1rem', fontWeight: '600', color: '#475569' }}>Cc</label>
+              <MultiSelectDropdown options={userOptions} selected={ccUsers} onChange={setCcUsers} placeholder="Add Cc..." />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', alignItems: 'start' }}>
+              <label style={{ paddingTop: '1rem', fontWeight: '600', color: '#475569' }}>Bcc</label>
+              <MultiSelectDropdown options={userOptions} selected={bccUsers} onChange={setBccUsers} placeholder="Add Bcc..." />
+            </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-              {/* Audience Selector (TO) */}
-              <div>
-                <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.75rem', color: '#334155' }}>
-                  Audience (To)
-                </label>
-                <MultiSelectDropdown 
-                  options={userOptions}
-                  selected={toUsers}
-                  onChange={setToUsers}
-                  placeholder="Select users for To field..."
-                />
-              </div>
+            <div style={{ borderTop: '1px solid #e2e8f0', margin: '0.5rem 0' }}></div>
 
-              {/* CC Selector */}
-              <div>
-                <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.75rem', color: '#334155' }}>
-                  CC
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileText size={16} /> Link Problem
                 </label>
-                <MultiSelectDropdown 
-                  options={userOptions}
-                  selected={ccUsers}
-                  onChange={setCcUsers}
-                  placeholder="Select users to CC..."
-                />
+                <select 
+                  className="input-field" 
+                  value={linkedProblem} 
+                  onChange={(e) => {
+                    setLinkedProblem(e.target.value);
+                    if (e.target.value) injectLink('problem', e.target.value);
+                  }}
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+                >
+                  <option value="">-- Select a Problem to Link --</option>
+                  {problemOptions.map(p => <option key={p.value} value={p.value}>{p.label} - {p.subLabel.substring(0,30)}...</option>)}
+                </select>
               </div>
-
-              {/* BCC Selector */}
-              <div>
-                <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.75rem', color: '#334155' }}>
-                  BCC
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MessageSquare size={16} /> Link Suggestion
                 </label>
-                <MultiSelectDropdown 
-                  options={userOptions}
-                  selected={bccUsers}
-                  onChange={setBccUsers}
-                  placeholder="Select users to BCC..."
-                />
+                <select 
+                  className="input-field" 
+                  value={linkedSuggestion} 
+                  onChange={(e) => {
+                    setLinkedSuggestion(e.target.value);
+                    if (e.target.value) injectLink('suggestion', e.target.value);
+                  }}
+                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+                >
+                  <option value="">-- Select a Suggestion to Link --</option>
+                  {suggestionOptions.map(s => <option key={s.value} value={s.value}>{s.label} - {s.subLabel.substring(0,30)}...</option>)}
+                </select>
               </div>
             </div>
 
-            {/* Email Subject */}
-            <div>
-              <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.75rem', color: '#334155' }}>
-                Subject
-              </label>
+            <div style={{ borderTop: '1px solid #e2e8f0', margin: '0.5rem 0' }}></div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', alignItems: 'center' }}>
+              <label style={{ fontWeight: '600', color: '#475569' }}>Subject</label>
               <input 
                 type="text" 
                 className="input-field" 
-                placeholder="e.g., Upcoming Workshop Deadline"
-                style={{ width: '100%', height: '54px', fontSize: '1rem' }}
+                placeholder="Enter subject here..." 
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
+                style={{ fontSize: '1.1rem', fontWeight: '500', padding: '0.75rem 1rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}
               />
             </div>
 
-            {/* Email Body */}
-            <div>
-              <label style={{ display: 'block', fontWeight: '600', marginBottom: '0.75rem', color: '#334155' }}>
-                Message Body
-              </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '1rem', alignItems: 'start' }}>
+              <label style={{ paddingTop: '0.5rem', fontWeight: '600', color: '#475569' }}>Message</label>
               <textarea 
                 className="input-field" 
-                placeholder="Write your email content here..."
-                style={{ width: '100%', minHeight: '200px', padding: '1rem', fontSize: '1rem', resize: 'vertical' }}
+                rows={12} 
+                placeholder="Write your message here..."
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
+                style={{ padding: '1rem', lineHeight: '1.6', background: '#f8fafc', border: '1px solid #e2e8f0' }}
               />
-            </div>
-
-            {/* Action Area */}
-            <div style={{ marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '2rem' }}>
-              {totalRecipients === 0 ? (
-                <div style={{ padding: '1rem', background: '#fef2f2', color: '#ef4444', borderRadius: '12px', textAlign: 'center', fontWeight: '500' }}>
-                  Please select at least one recipient (Audience, CC, or BCC).
-                </div>
-              ) : (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', background: '#fffbeb', color: '#b45309', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                    <AlertTriangle size={18} />
-                    <span>This will send to a total of <strong>{totalRecipients}</strong> recipients.</span>
-                  </div>
-                  
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem', color: '#0f172a' }}>
-                    Generate Email
-                  </h3>
-                  
-                  {batches.length <= 1 ? (
-                    <button 
-                      className="btn btn-primary" 
-                      style={{ width: '100%', height: '54px', fontSize: '1.1rem', display: 'flex', justifyContent: 'center', gap: '0.75rem' }}
-                      onClick={() => handleOpenClient(batches[0] || [])}
-                    >
-                      <Send size={20} />
-                      Open Email Client
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <p style={{ color: '#64748b', fontSize: '0.95rem', margin: 0, padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                        <strong style={{ color: '#0f172a' }}>Large Recipient List:</strong> Your browser cannot safely open a single email with {totalRecipients} addresses. The list has been split into {batches.length} batches. Click each button below to send separate emails.
-                      </p>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
-                        {batches.map((batch, idx) => (
-                          <button 
-                            key={idx}
-                            className="btn btn-secondary" 
-                            style={{ height: '54px', display: 'flex', justifyContent: 'center', gap: '0.5rem', background: 'white', border: '2px solid #e2e8f0', color: '#334155' }}
-                            onClick={() => handleOpenClient(batch)}
-                          >
-                            <Mail size={18} />
-                            Send Batch {idx + 1} ({batch.length})
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
           </div>
-        )}
-      </div>
+
+          <div style={{ marginTop: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+              <strong>{totalRecipients}</strong> recipients selected 
+              {batches.length > 1 && ` (will open ${batches.length} email drafts)`}
+            </div>
+            
+            {batches.length > 1 ? (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {batches.map((batch, index) => (
+                  <button 
+                    key={index}
+                    className="btn" 
+                    style={{ background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: 'white', padding: '0.75rem 1.25rem', borderRadius: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 6px rgba(79, 70, 229, 0.2)', border: 'none' }}
+                    onClick={() => handleOpenClient(batch)}
+                  >
+                    <Send size={18} /> Open Draft {index + 1}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button 
+                className="btn" 
+                style={{ background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: 'white', padding: '0.75rem 2rem', borderRadius: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 6px rgba(79, 70, 229, 0.2)', border: 'none', opacity: totalRecipients === 0 ? 0.5 : 1, cursor: totalRecipients === 0 ? 'not-allowed' : 'pointer' }}
+                onClick={() => totalRecipients > 0 && handleOpenClient(batches[0] || [])}
+                disabled={totalRecipients === 0}
+              >
+                <Send size={18} /> Open in Mail App
+              </button>
+            )}
+          </div>
+
+          {batches.length > 1 && (
+            <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '12px', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+              <AlertTriangle size={24} color="#d97706" style={{ flexShrink: 0 }} />
+              <p style={{ margin: 0, color: '#92400e', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                <strong>Large Distribution List Detected:</strong> You have selected {totalRecipients} recipients. To ensure reliable opening in your native mail client, the recipients have been split into {batches.length} separate email drafts. Please click each "Open Draft" button above to send them all.
+              </p>
+            </div>
+          )}
+
+        </div>
+      )}
     </div>
   );
 }

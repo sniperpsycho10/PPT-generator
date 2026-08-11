@@ -45,6 +45,11 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
         Best Practices Library
       </Link>
       
+      <Link href="/dashboard/problem-library" className={getClassName("/dashboard/problem-library")}>
+        <FileArchive size={18} />
+        Problem Library
+      </Link>
+      
       <Link href="/dashboard/submit-suggestion" className={getClassName("/dashboard/submit-suggestion")}>
         <MessageSquarePlus size={18} />
         Submit Suggestion
@@ -57,9 +62,21 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
         </Link>
       )}
 
+      {isAdmin && (
+        <Link href="/dashboard/teams" className={getClassName("/dashboard/teams")}>
+          <Users size={18} />
+          Teams
+        </Link>
+      )}
+
       <Link href="/dashboard/tracking" className={getClassName("/dashboard/tracking")}>
         <GitPullRequestDraft size={18} />
-        Tracking
+        Problem Tracking
+      </Link>
+
+      <Link href="/dashboard/suggestion-tracking" className={getClassName("/dashboard/suggestion-tracking")}>
+        <MessageSquare size={18} />
+        Suggestion Tracking
       </Link>
 
       {isAdmin && (
@@ -81,10 +98,6 @@ export default function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
           <Link href="/dashboard/reports/adoptions" className={getClassName("/dashboard/reports/adoptions")}>
             <BarChart3 size={18} />
             Adoptions Report
-          </Link>
-          <Link href="/dashboard/analytics" className={getClassName("/dashboard/analytics")}>
-            <TrendingUp size={18} />
-            Reporting Analytics
           </Link>
           
           <Link href="/dashboard/mail" className={getClassName("/dashboard/mail")}>

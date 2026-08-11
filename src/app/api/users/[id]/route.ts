@@ -71,9 +71,14 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
       return NextResponse.json({ success: false, error: "Only SuperAdmins can delete Admins" }, { status: 403 });
     }
 
-    const deletedUser = await prisma.user.update({
-      where: { id: targetUserId },
-      data: { deletedAt: new Date() }
+    // Nullify or delete related records that might restrict deletion (e.g. AuditLogs)
+    await prisma.auditLog.updateMany({
+      where: { userId: targetUserId },
+      data: { userId: null }
+    });
+
+    const deletedUser = await prisma.user.delete({
+      where: { id: targetUserId }
     });
     
     await prisma.auditLog.create({

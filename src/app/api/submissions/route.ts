@@ -69,6 +69,24 @@ export async function POST(req: Request) {
       }
     }
 
+    let newTrackingId = undefined;
+    if (cleanData.type === 'RepetitiveProblem') {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const prefix = `P-${year}${month}-`;
+      
+      const count = await prisma.submission.count({
+        where: {
+          type: 'RepetitiveProblem',
+          trackingId: { startsWith: prefix }
+        }
+      });
+      
+      const sequence = String(count + 1).padStart(3, '0');
+      newTrackingId = `${prefix}${sequence}`;
+    }
+
     const submission = await prisma.submission.create({
       data: {
         userId: dbUser.id,
@@ -80,6 +98,10 @@ export async function POST(req: Request) {
         whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
         actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
         customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
+        trackingId: newTrackingId,
+        severity: cleanData.type === 'RepetitiveProblem' ? (cleanData.severity || "Medium") : null,
+        trackingStatus: cleanData.type === 'RepetitiveProblem' ? "Open" : null,
+        progress: 0,
       }
     });
 

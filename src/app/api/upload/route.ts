@@ -8,7 +8,15 @@ import fs from "fs/promises";
 import sharp from "sharp";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+const ALLOWED_TYPES = [
+  "image/jpeg", "image/png", "image/webp", "image/gif", 
+  "application/pdf", 
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
+  "application/msword", // doc
+  "text/csv", // csv
+  "application/vnd.ms-excel", // xls
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // xlsx
+];
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 
 // Ensure upload directory exists
@@ -73,7 +81,19 @@ export async function POST(req: Request) {
     }
 
     // Save new file
-    const extension = mimeType === "image/jpeg" ? ".jpg" : (mimeType === "application/pdf" ? ".pdf" : path.extname(file.name));
+    const extMap: Record<string, string> = {
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/webp": ".webp",
+      "image/gif": ".gif",
+      "application/pdf": ".pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+      "application/msword": ".doc",
+      "text/csv": ".csv",
+      "application/vnd.ms-excel": ".xls",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx"
+    };
+    const extension = extMap[mimeType] || path.extname(file.name) || "";
     const filename = `${hash}${extension}`;
     const filePath = path.join(UPLOAD_DIR, filename);
 

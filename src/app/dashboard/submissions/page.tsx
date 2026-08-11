@@ -99,7 +99,13 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
                 </td>
                 <td>{new Date(sub.createdAt).toLocaleDateString()}</td>
                 <td>
-                  <ActionButtons id={sub.id} isAdmin={isAdmin} status={sub.status} />
+                  <ActionButtons 
+                    id={sub.id} 
+                    isAdmin={isAdmin} 
+                    status={sub.status} 
+                    type={sub.type}
+                    assignedTeamId={sub.assignedTeamId}
+                  />
                 </td>
               </tr>
             ))}

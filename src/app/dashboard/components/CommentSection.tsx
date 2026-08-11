@@ -81,11 +81,11 @@ export default function CommentSection({ submissionId, suggestionId }: CommentSe
           comments.map((comment) => (
             <div key={comment.id} className="flex gap-3 bg-white/5 p-3 rounded-lg border border-white/10">
               <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0">
-                {comment.user.image || comment.user.name ? (
-                  <Avatar 
+                {comment.user.image ? (
+                  <img 
                     src={comment.user.image} 
-                    name={comment.user.name || 'User'} 
-                    size={32}
+                    alt={comment.user.name || 'User'} 
+                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
                   />
                 ) : (
                   <UserIcon className="w-4 h-4 text-indigo-400" />

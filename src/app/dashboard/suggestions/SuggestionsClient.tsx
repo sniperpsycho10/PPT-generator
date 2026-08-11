@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Plus, X, Edit2 } from "lucide-react";
+import AssignTeamModal from "../components/AssignTeamModal";
 
 export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -15,9 +16,7 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
   const [users, setUsers] = useState<any[]>([]);
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [viewTeamModal, setViewTeamModal] = useState<any>(null);
-  const [teamSearchQuery, setTeamSearchQuery] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [teamName, setTeamName] = useState("");
+  const [currentTeamId, setCurrentTeamId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     guestName: "",
@@ -204,9 +203,7 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
                           {s.status === "Accepted" && !s.assignedTeamId && (
                             <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e3f2fd', color: '#1565c0' }} onClick={() => {
                               setCurrentId(s.id);
-                              setTeamName(`Team - ${s.suggestionText.substring(0, 15)}...`);
-                              setSelectedUsers([]);
-                              setTeamSearchQuery("");
+                              setCurrentTeamId(s.assignedTeamId || null);
                               setTeamModalOpen(true);
                             }}>Assign Team</button>
                           )}
@@ -272,82 +269,46 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {/* Assign Team Modal */}
-      {teamModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '600px', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-            <button style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setTeamModalOpen(false)}>
-              <X size={24} />
-            </button>
-            <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Create & Assign Team</h2>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (selectedUsers.length === 0) return alert("Select at least one user.");
-              try {
-                const resTeam = await fetch("/api/teams", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ name: teamName, memberIds: selectedUsers })
-                });
-                const teamData = await resTeam.json();
-                if (!resTeam.ok) throw new Error(teamData.error || "Failed to create team");
-                
-                await fetch(`/api/suggestions/${currentId}`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ assignedTeamId: teamData.data.id })
-                });
-                
-                setTeamModalOpen(false);
-                fetchSuggestions();
-              } catch(err: any) {
-                alert(err.message);
-              }
-            }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Team Name *</label>
-                <input type="text" className="input" required value={teamName} onChange={e => setTeamName(e.target.value)} />
-              </div>
-              
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Search Users</label>
-                <input type="text" className="input" placeholder="Search by name or email..." value={teamSearchQuery} onChange={e => setTeamSearchQuery(e.target.value)} />
-              </div>
+      <AssignTeamModal 
+        isOpen={teamModalOpen}
+        onClose={() => setTeamModalOpen(false)}
+        onAssignExisting={async (teamId) => {
+          const res = await fetch(`/api/suggestions/${currentId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assignedTeamId: teamId })
+          });
+          if (res.ok) {
+            setTeamModalOpen(false);
+            fetchSuggestions();
+          } else {
+            throw new Error("Failed to assign team");
+          }
+        }}
+        onCreateAndAssign={async (teamName, memberIds) => {
+          const resTeam = await fetch("/api/teams", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: teamName, memberIds })
+          });
+          const teamData = await resTeam.json();
+          if (!resTeam.ok) throw new Error(teamData.error || "Failed to create team");
+          
+          const resAssign = await fetch(`/api/suggestions/${currentId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assignedTeamId: teamData.data.id })
+          });
+          if (resAssign.ok) {
+            setTeamModalOpen(false);
+            fetchSuggestions();
+          } else {
+            throw new Error("Failed to assign team");
+          }
+        }}
+        currentTeamId={currentTeamId}
+      />
 
-              <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '1rem', maxHeight: '200px', overflowY: 'auto' }}>
-                {users.filter(u => 
-                  u.name?.toLowerCase().includes(teamSearchQuery.toLowerCase()) || 
-                  u.email?.toLowerCase().includes(teamSearchQuery.toLowerCase())
-                ).map(u => (
-                  <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', cursor: 'pointer', borderBottom: '1px solid #f5f5f5' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedUsers.includes(u.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedUsers([...selectedUsers, u.id]);
-                        else setSelectedUsers(selectedUsers.filter(id => id !== u.id));
-                      }} 
-                    />
-                    <div>
-                      <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{u.name || 'Unnamed'}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#666' }}>{u.email} - {u.department?.name || 'General'}</div>
-                    </div>
-                  </label>
-                ))}
-                {users.length === 0 && <div style={{ textAlign: 'center', color: '#999', padding: '1rem' }}>No users found.</div>}
-              </div>
-
-              <div style={{ fontSize: '0.9rem', color: 'var(--jspl-blue)' }}>
-                {selectedUsers.length} user(s) selected
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" className="btn btn-outline" onClick={() => setTeamModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create & Assign Team</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* View Team Modal */}
       {viewTeamModal && (

@@ -20,8 +20,8 @@ async function checkAdmin() {
 // GET all teams
 export async function GET(req: Request) {
   try {
-    const isAdmin = await checkAdmin();
-    if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const teams = await prisma.team.findMany({
       include: {
