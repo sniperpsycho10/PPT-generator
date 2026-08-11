@@ -71,10 +71,9 @@ export async function GET() {
     if (auth.error) return auth.error;
     const { userId, userRole } = auth;
 
-    let whereClause: any = { deletedAt: null };
+    let whereClause: any = {};
     if (userRole !== 'Admin' && userRole !== 'SuperAdmin') {
       whereClause = {
-        deletedAt: null,
         OR: [
           { suggestedById: userId },
           { submission: { userId: userId } }

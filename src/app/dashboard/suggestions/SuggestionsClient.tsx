@@ -188,50 +188,68 @@ export default function SuggestionsClient({ isAdmin }: { isAdmin: boolean }) {
             <tbody>
               {loading && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center' }}>Loading...</td></tr>}
               {!loading && suggestions.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>No suggestions found.</td></tr>}
-              {!loading && suggestions.filter(s => filterProblemId === "ALL" || (s.submission?.title || "General Suggestion") === filterProblemId).map(s => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '1rem 0' }}>{s.suggestionText}</td>
-                  <td>{s.submission?.title || <span style={{ color: '#888', fontStyle: 'italic' }}>General Suggestion</span>}</td>
-                  <td>{s.guestName || "Anonymous"}</td>
-                  <td>{s.guestDept || "General"}</td>
-                  <td>{getStatusBadge(s.status)}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {isAdmin ? (
-                        <>
-                          {s.status !== "Accepted" && <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e8f5e9', color: '#2e7d32' }} onClick={() => updateStatus(s.id, "Accepted")}>Accept</button>}
-                          {s.status === "Accepted" && !s.assignedTeamId && (
-                            <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e3f2fd', color: '#1565c0' }} onClick={() => {
-                              setCurrentId(s.id);
-                              setCurrentTeamId(s.assignedTeamId || null);
-                              setTeamModalOpen(true);
-                            }}>Assign Team</button>
+              {!loading && Object.entries(
+                suggestions
+                  .filter(s => filterProblemId === "ALL" || (s.submission?.title || "General Suggestion") === filterProblemId)
+                  .reduce((acc: any, s: any) => {
+                    const groupName = s.submission?.title ? `For Problem: ${s.submission.title}` : 'General Suggestions';
+                    if (!acc[groupName]) acc[groupName] = [];
+                    acc[groupName].push(s);
+                    return acc;
+                  }, {})
+              ).map(([groupName, groupSugs]: [string, any]) => (
+                <React.Fragment key={groupName}>
+                  <tr style={{ backgroundColor: 'var(--card-bg)', borderBottom: '2px solid var(--border-color)' }}>
+                    <td colSpan={6} style={{ padding: '1rem', fontWeight: 'bold', color: 'var(--accent-color)', fontSize: '1.1rem' }}>
+                      {groupName}
+                    </td>
+                  </tr>
+                  {groupSugs.map((s: any) => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '1rem 0' }}>{s.suggestionText}</td>
+                      <td>{s.submission?.title || <span style={{ color: '#888', fontStyle: 'italic' }}>General Suggestion</span>}</td>
+                      <td>{s.guestName || "Anonymous"}</td>
+                      <td>{s.guestDept || "General"}</td>
+                      <td>{getStatusBadge(s.status)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {isAdmin ? (
+                            <>
+                              {s.status !== "Accepted" && <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e8f5e9', color: '#2e7d32' }} onClick={() => updateStatus(s.id, "Accepted")}>Accept</button>}
+                              {s.status === "Accepted" && !s.assignedTeamId && (
+                                <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e3f2fd', color: '#1565c0' }} onClick={() => {
+                                  setCurrentId(s.id);
+                                  setCurrentTeamId(s.assignedTeamId || null);
+                                  setTeamModalOpen(true);
+                                }}>Assign Team</button>
+                              )}
+                              {s.status === "Accepted" && s.assignedTeamId && (
+                                <span 
+                                  style={{ fontSize: '0.8rem', color: '#2e7d32', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }} 
+                                  onClick={() => setViewTeamModal(s.assignedTeam)}
+                                >
+                                  Team: {s.assignedTeam?.name}
+                                </span>
+                              )}
+                              {s.status !== "Rejected" && <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#ffebee', color: '#c62828' }} onClick={() => updateStatus(s.id, "Rejected")}>Reject</button>}
+                              {s.status !== "Review" && s.status !== "Pending" && <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e3f2fd', color: '#1565c0' }} onClick={() => updateStatus(s.id, "Pending")}>Undo</button>}
+                              <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#fafafa', color: '#d32f2f', border: '1px solid #d32f2f' }} onClick={() => deleteSuggestion(s.id)}>Delete</button>
+                            </>
+                          ) : (
+                            <>
+                              {s.status !== "Accepted" && (
+                                <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }} onClick={() => openEditModal(s)}>
+                                  <Edit2 size={14} /> Edit
+                                </button>
+                              )}
+                              <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#fafafa', color: '#d32f2f', border: '1px solid #d32f2f' }} onClick={() => deleteSuggestion(s.id)}>Delete</button>
+                            </>
                           )}
-                          {s.status === "Accepted" && s.assignedTeamId && (
-                            <span 
-                              style={{ fontSize: '0.8rem', color: '#2e7d32', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }} 
-                              onClick={() => setViewTeamModal(s.assignedTeam)}
-                            >
-                              Team: {s.assignedTeam?.name}
-                            </span>
-                          )}
-                          {s.status !== "Rejected" && <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#ffebee', color: '#c62828' }} onClick={() => updateStatus(s.id, "Rejected")}>Reject</button>}
-                          {s.status !== "Review" && s.status !== "Pending" && <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#e3f2fd', color: '#1565c0' }} onClick={() => updateStatus(s.id, "Pending")}>Undo</button>}
-                          <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#fafafa', color: '#d32f2f', border: '1px solid #d32f2f' }} onClick={() => deleteSuggestion(s.id)}>Delete</button>
-                        </>
-                      ) : (
-                        <>
-                          {s.status !== "Accepted" && (
-                            <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }} onClick={() => openEditModal(s)}>
-                              <Edit2 size={14} /> Edit
-                            </button>
-                          )}
-                          <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', backgroundColor: '#fafafa', color: '#d32f2f', border: '1px solid #d32f2f' }} onClick={() => deleteSuggestion(s.id)}>Delete</button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

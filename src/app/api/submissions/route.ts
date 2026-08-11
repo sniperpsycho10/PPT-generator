@@ -69,55 +69,72 @@ export async function POST(req: Request) {
       }
     }
 
-    let newTrackingId = undefined;
-    if (cleanData.type === 'RepetitiveProblem') {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const prefix = `P-${year}${month}-`;
-      
-      const count = await prisma.submission.count({
-        where: {
-          type: 'RepetitiveProblem',
-          trackingId: { startsWith: prefix }
+    const submissionResult = await prisma.$transaction(async (tx: any) => {
+      let newTrackingId = undefined;
+      if (cleanData.type === 'RepetitiveProblem') {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const prefix = `P-${year}${month}-`;
+        
+        // Find the highest existing trackingId for this month to avoid duplicates if records were deleted
+        const lastSub = await tx.submission.findFirst({
+          where: {
+            type: 'RepetitiveProblem',
+            trackingId: { startsWith: prefix }
+          },
+          orderBy: { trackingId: 'desc' }
+        });
+        
+        let sequenceNum = 1;
+        if (lastSub && lastSub.trackingId) {
+          const parts = lastSub.trackingId.split('-');
+          if (parts.length === 3) {
+            sequenceNum = parseInt(parts[2], 10) + 1;
+          }
+        }
+        
+        const sequence = String(sequenceNum).padStart(3, '0');
+        newTrackingId = `${prefix}${sequence}`;
+      }
+
+      const submission = await tx.submission.create({
+        data: {
+          userId: dbUser.id,
+          departmentId: dbUser.departmentId,
+          ...cleanData,
+          cycleId: finalCycleId || null,
+          calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
+          impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
+          whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
+          actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
+          customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
+          trackingId: newTrackingId,
+          severity: cleanData.type === 'RepetitiveProblem' ? (cleanData.severity || "Medium") : null,
+          trackingStatus: cleanData.type === 'RepetitiveProblem' ? "Open" : null,
+          progress: 0,
         }
       });
-      
-      const sequence = String(count + 1).padStart(3, '0');
-      newTrackingId = `${prefix}${sequence}`;
-    }
 
-    const submission = await prisma.submission.create({
-      data: {
-        userId: dbUser.id,
-        departmentId: dbUser.departmentId,
-        ...cleanData,
-        cycleId: finalCycleId || null,
-        calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
-        impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
-        whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
-        actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
-        customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
-        trackingId: newTrackingId,
-        severity: cleanData.type === 'RepetitiveProblem' ? (cleanData.severity || "Medium") : null,
-        trackingStatus: cleanData.type === 'RepetitiveProblem' ? "Open" : null,
-        progress: 0,
-      }
+      await tx.auditLog.create({
+        data: {
+          entityId: submission.id,
+          entityType: 'Submission',
+          action: 'CREATE',
+          userId: dbUser.id,
+          changedFields: submission as any
+        }
+      });
+
+      return submission;
     });
 
-    await prisma.auditLog.create({
-      data: {
-        entityId: submission.id,
-        entityType: 'Submission',
-        action: 'CREATE',
-        userId: dbUser.id,
-        changedFields: submission as any
-      }
-    });
-
-    return NextResponse.json({ success: true, submission });
-  } catch (error) {
+    return NextResponse.json({ success: true, submission: submissionResult });
+  } catch (error: any) {
     console.error("Submission Error:", error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: "A concurrent submission occurred. Please try again." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to create submission" }, { status: 500 });
   }
 }

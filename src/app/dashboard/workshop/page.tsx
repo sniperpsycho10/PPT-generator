@@ -351,7 +351,7 @@ export default function WorkshopMode() {
     fetch('/api/suggestions')
       .then(r => r.json())
       .then(res => {
-        if (res.data) setSuggestions(res.data.filter((s: any) => s.status === 'Accepted' && !s.submissionId));
+        if (res.data) setSuggestions(res.data.filter((s: any) => s.status === 'Accepted'));
       })
       .catch(console.error);
   }, []);
@@ -747,13 +747,27 @@ export default function WorkshopMode() {
             <h1 style={{ color: t.heading, fontSize: '2.5rem', margin: 0, paddingLeft: templateStyle === 'modern' ? '6rem' : '0' }}>Outstanding Suggestions</h1>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: 'calc(100% - 6rem)', overflowY: 'auto' }}>
             {suggestions.length === 0 && <p style={{ fontSize: '1.2rem', color: t.text }}>No suggestions accepted yet.</p>}
-            {suggestions.map(s => (
-              <div key={s.id} style={{ flex: '1 1 calc(33% - 1.5rem)', backgroundColor: t.cardBg, borderRadius: '8px', borderLeft: `4px solid ${t.accent}`, padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <p style={{ fontSize: '1.1rem', marginBottom: '1rem', fontStyle: 'italic' }}>"{s.suggestionText}"</p>
-                <div style={{ fontWeight: 'bold', color: t.heading }}>— {s.guestName || 'Anonymous'}</div>
-                <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{s.guestDept || 'General'} Dept</div>
+            {Object.entries(
+              suggestions.reduce((acc: any, s: any) => {
+                const groupName = s.submission?.title ? `For Problem: ${s.submission.title}` : 'General Suggestions';
+                if (!acc[groupName]) acc[groupName] = [];
+                acc[groupName].push(s);
+                return acc;
+              }, {})
+            ).map(([groupName, groupSugs]: [string, any]) => (
+              <div key={groupName} style={{ marginBottom: '1rem' }}>
+                <h3 style={{ color: t.heading, borderBottom: `2px solid ${t.accent}`, paddingBottom: '0.5rem', marginBottom: '1.5rem', fontSize: '1.5rem' }}>{groupName}</h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+                  {groupSugs.map((s: any) => (
+                    <div key={s.id} style={{ flex: '1 1 calc(33% - 1.5rem)', backgroundColor: t.cardBg, borderRadius: '8px', borderLeft: `4px solid ${t.accent}`, padding: '1.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                      <p style={{ fontSize: '1.1rem', marginBottom: '1rem', fontStyle: 'italic' }}>"{s.suggestionText}"</p>
+                      <div style={{ fontWeight: 'bold', color: t.heading }}>— {s.guestName || 'Anonymous'}</div>
+                      <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{s.guestDept || 'General'} Dept</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

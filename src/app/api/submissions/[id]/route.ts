@@ -74,85 +74,87 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     // Preserve status if it is already Accepted/Rejected so Admin edits don't revert it
     const newStatus = (oldSub.status === 'Accepted' || oldSub.status === 'Rejected') && userRole !== 'SuperAdmin' ? oldSub.status : data.status;
 
-    // Handle dynamic department assignment
-    const deptName = data.scannedDepartment || "Mechanical";
-    let department = await prisma.department.findFirst({ where: { name: deptName }});
-    if (!department) {
-      department = await prisma.department.create({
-        data: { name: deptName, qrCodeHash: `DPT_${Math.random()}` }
-      });
-    }
-
-    // Minimal edit logic
-    const updatedSub = await prisma.submission.update({
-      where: { id },
-      data: {
-        departmentId: department.id,
-        title: data.title,
-        description: data.description,
-        status: newStatus as any,
-        objective: data.objective,
-        problemAddressed: data.problemAddressed,
-        methodology: data.methodology,
-        impactSavings: data.impactSavings ? parseFloat(data.impactSavings) : null,
-        equipmentDetails: data.equipmentDetails,
-        problemStatement: data.problemStatement,
-        calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
-        impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
-        whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
-        actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
-        beforeImageUrl: data.beforeImageUrl,
-        afterImageUrl: data.afterImageUrl,
-        attachmentUrl: data.attachmentUrl,
-        supportingSlideType: data.supportingSlideType,
-        customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
-        supportingImages: data.supportingImages || [],
-        cycleId: data.cycleId || null,
-        assignedTeamId: data.assignedTeamId !== undefined ? data.assignedTeamId : oldSub.assignedTeamId
-      }
-    });
-
-    if (data.assignedTeamId && data.assignedTeamId !== oldSub.assignedTeamId) {
-      const team = await prisma.team.findUnique({
-        where: { id: data.assignedTeamId },
-        include: { members: true }
-      });
-      if (team && team.members.length > 0) {
-        await prisma.notification.createMany({
-          data: team.members.map((m: any) => ({
-            userId: m.id,
-            title: "New Assignment",
-            message: `Your team (${team.name}) has been assigned to Repetitive Problem: ${updatedSub.trackingId || updatedSub.title}`,
-            link: "/dashboard/tracking"
-          }))
+    await prisma.$transaction(async (tx: any) => {
+      // Handle dynamic department assignment
+      const deptName = data.scannedDepartment || "Mechanical";
+      let department = await tx.department.findFirst({ where: { name: deptName }});
+      if (!department) {
+        department = await tx.department.create({
+          data: { name: deptName, qrCodeHash: `DPT_${Math.random()}` }
         });
       }
-    }
 
-    // Save Version History
-    const maxVersion = await prisma.submissionVersion.findFirst({ 
-      where: { submissionId: id }, 
-      orderBy: { versionNum: 'desc' } 
-    });
-    const nextVersionNum = maxVersion ? maxVersion.versionNum + 1 : 1;
+      // Minimal edit logic
+      const updatedSub = await tx.submission.update({
+        where: { id },
+        data: {
+          departmentId: department.id,
+          title: data.title,
+          description: data.description,
+          status: newStatus as any,
+          objective: data.objective,
+          problemAddressed: data.problemAddressed,
+          methodology: data.methodology,
+          impactSavings: data.impactSavings ? parseFloat(data.impactSavings) : null,
+          equipmentDetails: data.equipmentDetails,
+          problemStatement: data.problemStatement,
+          calculationTable: typeof data.calculationTable === 'string' ? JSON.parse(data.calculationTable || '[]') : data.calculationTable,
+          impactCalculation: typeof data.impactCalculation === 'string' ? JSON.parse(data.impactCalculation || '[]') : data.impactCalculation,
+          whyWhyAnalysis: typeof data.whyWhyAnalysis === 'string' ? JSON.parse(data.whyWhyAnalysis || '[]') : data.whyWhyAnalysis,
+          actionTakenTable: typeof data.actionTakenTable === 'string' ? JSON.parse(data.actionTakenTable || '[]') : data.actionTakenTable,
+          beforeImageUrl: data.beforeImageUrl,
+          afterImageUrl: data.afterImageUrl,
+          attachmentUrl: data.attachmentUrl,
+          supportingSlideType: data.supportingSlideType,
+          customTable: typeof data.customTable === 'string' ? JSON.parse(data.customTable || '[]') : data.customTable,
+          supportingImages: data.supportingImages || [],
+          cycleId: data.cycleId || null,
+          assignedTeamId: data.assignedTeamId !== undefined ? data.assignedTeamId : oldSub.assignedTeamId
+        }
+      });
 
-    await prisma.submissionVersion.create({
-      data: {
-        submissionId: id,
-        versionNum: nextVersionNum,
-        dataSnapshot: oldSub as any,
-        updatedById: userId
+      if (data.assignedTeamId && data.assignedTeamId !== oldSub.assignedTeamId) {
+        const team = await tx.team.findUnique({
+          where: { id: data.assignedTeamId },
+          include: { members: true }
+        });
+        if (team && team.members.length > 0) {
+          await tx.notification.createMany({
+            data: team.members.map((m: any) => ({
+              userId: m.id,
+              title: "New Assignment",
+              message: `Your team (${team.name}) has been assigned to Repetitive Problem: ${updatedSub.trackingId || updatedSub.title}`,
+              link: "/dashboard/tracking"
+            }))
+          });
+        }
       }
-    });
 
-    await prisma.auditLog.create({
-      data: {
-        entityId: id,
-        entityType: 'Submission',
-        action: 'UPDATE',
-        userId: userId,
-        changedFields: updatedSub as any
-      }
+      // Save Version History
+      const maxVersion = await tx.submissionVersion.findFirst({ 
+        where: { submissionId: id }, 
+        orderBy: { versionNum: 'desc' } 
+      });
+      const nextVersionNum = maxVersion ? maxVersion.versionNum + 1 : 1;
+
+      await tx.submissionVersion.create({
+        data: {
+          submissionId: id,
+          versionNum: nextVersionNum,
+          dataSnapshot: oldSub as any,
+          updatedById: userId
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          entityId: id,
+          entityType: 'Submission',
+          action: 'UPDATE',
+          userId: userId,
+          changedFields: updatedSub as any
+        }
+      });
     });
 
     return NextResponse.json({ success: true });

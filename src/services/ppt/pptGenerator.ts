@@ -80,17 +80,20 @@ export async function generateWorkshopPpt(body: any, reportId: string | null = n
     const customColors = body.customColors || {};
 
     let origin = body.origin || "";
-    if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("172.")) {
+    if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("172.17.")) {
       const interfaces = os.networkInterfaces();
       let allIps: string[] = [];
       for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]!) {
-          if (iface.family === "IPv4" && !iface.internal && !iface.address.startsWith("172.") && !iface.address.startsWith("169.254.")) {
+          if (iface.family === "IPv4" && !iface.internal && !iface.address.startsWith("169.254.")) {
             allIps.push(iface.address);
           }
         }
       }
-      const networkIp = allIps.find(ip => ip.startsWith("192.168.")) || allIps.find(ip => ip.startsWith("10.")) || allIps[0] || "localhost";
+      const networkIp = allIps.find(ip => ip.startsWith("192.168.")) || 
+                        allIps.find(ip => ip.startsWith("10.")) || 
+                        allIps.find(ip => ip.startsWith("172.") && !ip.startsWith("172.17.") && !ip.startsWith("172.18.")) ||
+                        allIps[0] || "localhost";
       const port = process.env.PORT || 4000;
       origin = `http://${networkIp}:${port}`;
 
@@ -767,23 +770,39 @@ export async function generateWorkshopPpt(body: any, reportId: string | null = n
     stSlide.addTable(stRows as any, { x: 0.1, y: 1.4, w: 9.8, colW: [0.8, 1.2, 1.4, 2, 1, 1.2, 1, 1.2], border: { pt: 1, color: "CCCCCC" }, rowH: 0.4, valign: 'middle', fontSize: 8, autoPage: true });
 
     // FEEDBACK GALLERY SLIDE
-    const suggestions = await prisma.suggestion.findMany({ where: { status: "Accepted", submissionId: null } });
+    const suggestions = await prisma.suggestion.findMany({ where: { status: "Accepted" }, include: { submission: true } });
     if (suggestions.length > 0) {
-      const fbSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
-      if (templateStyle === 'corporate' && !body.customColors) {
-        fbSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.5, h: 5.625, fill: { color: "2C3E50" } });
+      const groupedSuggestions = suggestions.reduce((acc: any, s: any) => {
+        const groupName = s.submission?.title ? `For Problem: ${s.submission.title}` : 'General Suggestions';
+        if (!acc[groupName]) acc[groupName] = [];
+        acc[groupName].push(s);
+        return acc;
+      }, {});
+
+      for (const [groupName, groupSugs] of Object.entries(groupedSuggestions)) {
+        const sugs = groupSugs as any[];
+        // max 4 suggestions per slide
+        for (let i = 0; i < sugs.length; i += 4) {
+          const chunk = sugs.slice(i, i + 4);
+          
+          const fbSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });
+          if (templateStyle === 'corporate' && !body.customColors) {
+            fbSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.5, h: 5.625, fill: { color: "2C3E50" } });
+          }
+          const headerX = templateStyle === 'modern' ? 1.5 : 0.4;
+          fbSlide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.4, w: 0.05, h: 0.4, fill: { color: accentPrimary } });
+          fbSlide.addText(`OUTSTANDING SUGGESTIONS`, { x: headerX + 0.1, y: 0.4, w: 8, h: 0.4, fontSize: 24, bold: true, color: textHeading });
+          fbSlide.addText(groupName, { x: headerX + 0.1, y: 0.8, w: 8, h: 0.3, fontSize: 16, bold: true, color: accentPrimary });
+          
+          let startY = 1.3;
+          chunk.forEach((s: any) => {
+            fbSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: startY, w: 9, h: 0.8, fill: { color: cardBg }, line: { color: accentPrimary, width: 2 }, rectRadius: 0.1 });
+            fbSlide.addText(`"${s.suggestionText}"`, { x: 0.6, y: startY + 0.1, w: 8.8, h: 0.4, fontSize: 14, italic: true, color: textBody });
+            fbSlide.addText(`— ${s.guestName || "Anonymous"} (${s.guestDept || "General"} Dept)`, { x: 0.6, y: startY + 0.45, w: 8.8, h: 0.2, fontSize: 10, bold: true, color: textHeading });
+            startY += 1.0;
+          });
+        }
       }
-      const headerX = templateStyle === 'modern' ? 1.5 : 0.4;
-      fbSlide.addShape(pptx.ShapeType.rect, { x: headerX, y: 0.6, w: 0.05, h: 0.4, fill: { color: accentPrimary } });
-      fbSlide.addText("OUTSTANDING SUGGESTIONS", { x: headerX + 0.1, y: 0.6, w: 8, h: 0.4, fontSize: 24, bold: true, color: textHeading });
-      
-      let startY = 1.5;
-      suggestions.slice(0, 4).forEach((s: any) => {
-        fbSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: startY, w: 9, h: 0.8, fill: { color: cardBg }, line: { color: accentPrimary, width: 2 }, rectRadius: 0.1 });
-        fbSlide.addText(`"${s.suggestionText}"`, { x: 0.6, y: startY + 0.1, w: 8.8, h: 0.4, fontSize: 14, italic: true, color: textBody });
-        fbSlide.addText(`— ${s.guestName || "Anonymous"} (${s.guestDept || "General"} Dept)`, { x: 0.6, y: startY + 0.45, w: 8.8, h: 0.2, fontSize: 10, bold: true, color: textHeading });
-        startY += 1.0;
-      });
     }
 
     let qrSlide = pptx.addSlide({ masterName: "PREMIUM_MASTER" });

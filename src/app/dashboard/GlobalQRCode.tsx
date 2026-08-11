@@ -1,14 +1,26 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { QrCode, X } from "lucide-react";
 
 export default function GlobalQRCode() {
   const [isOpen, setIsOpen] = useState(false);
+  const [suggestionUrl, setSuggestionUrl] = useState<string>('');
 
-  // Use a hardcoded origin or window.location.origin if available
-  const suggestionUrl = typeof window !== 'undefined' ? `${window.location.origin}/feedback` : 'http://localhost:3000/feedback';
+  useEffect(() => {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000';
+    setSuggestionUrl(`${base}/feedback`);
+    
+    fetch('/api/network-ip')
+      .then(res => res.json())
+      .then(res => {
+        if (res.origin) {
+          setSuggestionUrl(`${res.origin}/feedback`);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   return (
     <>

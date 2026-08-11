@@ -21,9 +21,23 @@ export async function PATCH(req: Request, props: { params: Promise<{ id: string 
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const updated = await prisma.submission.update({
-      where: { id },
-      data: { status }
+    const updated = await prisma.$transaction(async (tx: any) => {
+      const sub = await tx.submission.update({
+        where: { id },
+        data: { status }
+      });
+      
+      await tx.auditLog.create({
+        data: {
+          entityId: id,
+          entityType: 'Submission',
+          action: 'UPDATE',
+          userId: (session.user as any).id || null,
+          changedFields: { status }
+        }
+      });
+      
+      return sub;
     });
 
     return NextResponse.json({ success: true, submission: updated });

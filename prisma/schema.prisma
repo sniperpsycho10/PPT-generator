@@ -144,7 +144,7 @@ model Submission {
   departmentId String
   department   Department     @relation(fields: [departmentId], references: [id])
   userId       String
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   type         SubmissionType
   title        String
   description  String
@@ -225,7 +225,7 @@ model Suggestion {
   submissionId   String?
   submission     Submission?      @relation(fields: [submissionId], references: [id])
   suggestedById  String?
-  suggestedBy    User?            @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
+  suggestedBy    User?            @relation(fields: [suggestedById], references: [id], onDelete: SetNull)
   guestName      String?
   guestDept      String?
   suggestionText String
@@ -259,7 +259,7 @@ model ActionItem {
   suggestionId String
   suggestion   Suggestion       @relation(fields: [suggestionId], references: [id])
   assignedToId String
-  assignedTo   User             @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
+  assignedTo   User             @relation(fields: [assignedToId], references: [id], onDelete: Restrict)
   dueDate      DateTime
   status       ActionItemStatus
   evidenceUrl  String?
